@@ -5,6 +5,17 @@ An Arabic-first, RTL craftsmen / home-services marketplace for the Egyptian mark
 > Currency: ج.م (EGP). Roles: customer, worker, admin.
 
 ---
+## link ---> https://angezny.vercel.app/
+## Existed Users
+| Email | Password |
+|------|------|
+| admin@admin.com | 123456 |
+| worker@worker.com | 123456 |
+| customer@customer.com | 123456 |
+
+or add someone by yourself :)
+
+
 
 ## Tech Stack
 
@@ -289,8 +300,8 @@ You still insist on cloning? Then follow the steps below
 ### 1. Clone
 
 ```bash
-git clone <repo-url>
-cd "Orgenal Fianl Project"
+git clone https://github.com/abdomasry/Angezny-Web-Application.git
+cd "Repo Fianl Project"
 git submodule update --init --recursive   # front-end is a submodule
 ```
 
