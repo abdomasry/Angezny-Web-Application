@@ -280,6 +280,12 @@ An Arabic-first, RTL craftsmen / home-services marketplace for the Egyptian mark
 
 ## Setup
 
+### 0. You don't need to clone it or install it just hit this link :)
+
+https://angezny.vercel.app/
+
+You still insist on cloning? Then follow the steps below 
+
 ### 1. Clone
 
 ```bash
