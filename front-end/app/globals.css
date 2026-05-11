@@ -1,0 +1,218 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Leaflet's stylesheet is small (~14KB) and previously lived inside the
+   AddressPicker's lazy chunk. Hoisting it here removes a source of CSS
+   chunk-graph thrash that was contributing to dev-server cache pressure. */
+@import "leaflet/dist/leaflet.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-arabic), var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-arabic), var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Design System: The Digital Majlis - MD3 Color Tokens */
+  --color-primary-container: #0f766e;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #a3faef;
+  --color-surface: #f8f9ff;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-dim: #d0dbed;
+  --color-surface-variant: #d9e3f6;
+  --color-surface-container: #e6eeff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #dee9fc;
+  --color-surface-container-highest: #d9e3f6;
+  --color-on-surface: #121c2a;
+  --color-on-surface-variant: #3e4947;
+  --color-on-background: #121c2a;
+  --color-outline: #6e7977;
+  --color-outline-variant: #bdc9c6;
+  --color-tertiary: #005c51;
+  --color-tertiary-container: #007769;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #9efbe9;
+  --color-secondary-container: #dee0df;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #606363;
+  --color-primary-fixed: #9cf2e8;
+  --color-primary-fixed-dim: #80d5cb;
+  --color-on-primary-fixed: #00201d;
+  --color-on-primary-fixed-variant: #00504a;
+  --color-secondary-fixed: #e1e3e2;
+  --color-secondary-fixed-dim: #c4c7c6;
+  --color-on-secondary-fixed: #191c1c;
+  --color-on-secondary-fixed-variant: #444747;
+  --color-tertiary-fixed: #96f3e1;
+  --color-tertiary-fixed-dim: #7ad7c6;
+  --color-on-tertiary-fixed: #00201b;
+  --color-on-tertiary-fixed-variant: #005046;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+  --color-inverse-surface: #27313f;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-inverse-primary: #80d5cb;
+  --color-surface-tint: #006a63;
+}
+
+:root {
+  --background: #f8f9ff;
+  --foreground: #121c2a;
+  --card: #ffffff;
+  --card-foreground: #121c2a;
+  --popover: #ffffff;
+  --popover-foreground: #121c2a;
+  --primary: #005c55;
+  --primary-foreground: #ffffff;
+  --secondary: #5c5f5e;
+  --secondary-foreground: #ffffff;
+  --muted: #eff4ff;
+  --muted-foreground: #3e4947;
+  --accent: #eff4ff;
+  --accent-foreground: #121c2a;
+  --destructive: #ba1a1a;
+  --border: #bdc9c6;
+  --input: #bdc9c6;
+  --ring: #005c55;
+  --chart-1: #005c55;
+  --chart-2: #0f766e;
+  --chart-3: #9cf2e8;
+  --chart-4: #3e4947;
+  --chart-5: #dee9fc;
+  --radius: 0.625rem;
+  --sidebar: #eff4ff;
+  --sidebar-foreground: #121c2a;
+  --sidebar-primary: #005c55;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dee9fc;
+  --sidebar-accent-foreground: #121c2a;
+  --sidebar-border: #bdc9c6;
+  --sidebar-ring: #005c55;
+}
+
+.dark {
+  --background: #0f1722;
+  --foreground: #eaf1ff;
+  --card: #1a2433;
+  --card-foreground: #eaf1ff;
+  --popover: #1a2433;
+  --popover-foreground: #eaf1ff;
+  --primary: #80d5cb;
+  --primary-foreground: #00382f;
+  --secondary: #c4c7c6;
+  --secondary-foreground: #2d3130;
+  --muted: #27313f;
+  --muted-foreground: #bdc9c6;
+  --accent: #27313f;
+  --accent-foreground: #eaf1ff;
+  --destructive: #ffb4ab;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #80d5cb;
+  --chart-1: #80d5cb;
+  --chart-2: #9cf2e8;
+  --chart-3: #0f766e;
+  --chart-4: #bdc9c6;
+  --chart-5: #27313f;
+  --sidebar: #1a2433;
+  --sidebar-foreground: #eaf1ff;
+  --sidebar-primary: #80d5cb;
+  --sidebar-primary-foreground: #00382f;
+  --sidebar-accent: #27313f;
+  --sidebar-accent-foreground: #eaf1ff;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #80d5cb;
+}
+
+button {
+    cursor: pointer;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'IBM Plex Sans Arabic', var(--font-arabic), var(--font-sans), sans-serif;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Glass & Gradient Styles */
+.glass-nav {
+  background: rgba(248, 249, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #005c55 0%, #0f766e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Bento Grid Animations */
+.bento-item {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.bento-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 24px -12px rgba(18, 28, 42, 0.06);
+}
+
+*{
+  overflow-wrap:anywhere;
+}

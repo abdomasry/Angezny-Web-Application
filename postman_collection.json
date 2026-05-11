@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "Craftsmen Marketplace API",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "description": "Full API collection for the craftsmen marketplace backend.\n\nSet two collection variables before using:\n- baseUrl: http://localhost:5000 (or wherever the backend runs)\n- token: paste a JWT after signing in (Auth > Signin response)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "token", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Signup", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/signup", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Password123\",\n  \"role\": \"customer\"\n}" } } },
+        { "name": "Signin", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/signin", "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Password123\"\n}" } } },
+        { "name": "Google Signin", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/google", "body": { "mode": "raw", "raw": "{\n  \"idToken\": \"GOOGLE_ID_TOKEN\"\n}" } } },
+        { "name": "Facebook Signin", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/facebook", "body": { "mode": "raw", "raw": "{\n  \"accessToken\": \"FACEBOOK_ACCESS_TOKEN\"\n}" } } },
+        { "name": "Forgot Password", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/forgot-password", "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\"\n}" } } },
+        { "name": "Reset Password", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/reset-password", "body": { "mode": "raw", "raw": "{\n  \"token\": \"RESET_TOKEN\",\n  \"newPassword\": \"NewPassword123\"\n}" } } },
+        { "name": "Verify Email", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/verify-email", "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"code\": \"123456\"\n}" } } },
+        { "name": "Resend Verification Code", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/auth/resend-verification-code", "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\"\n}" } } },
+        { "name": "Get Me", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" } },
+        { "name": "Get Notifications", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/notifications" } },
+        { "name": "Mark Notifications Read", "request": { "method": "PUT", "url": "{{baseUrl}}/api/auth/notifications/read-all" } }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        { "name": "Get All Categories", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/categories" } },
+        { "name": "Get Category By ID", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/categories/:id" } },
+        { "name": "Create Category (admin)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/categories", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Plumbing\",\n  \"icon\": \"wrench\"\n}" } } },
+        { "name": "Update Category (admin)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/categories/:id", "body": { "mode": "raw", "raw": "{\n  \"name\": \"Plumbing\"\n}" } } },
+        { "name": "Delete Category (admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/categories/:id" } }
+      ]
+    },
+    {
+      "name": "Workers (Public)",
+      "item": [
+        { "name": "Get Workers (filter/paginate)", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/workers?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["api","workers"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"},{"key":"category","value":"","disabled":true},{"key":"search","value":"","disabled":true}] } } },
+        { "name": "Update My Location (worker)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/workers/me/location", "body": { "mode": "raw", "raw": "{\n  \"lat\": 30.0444,\n  \"lng\": 31.2357,\n  \"address\": \"Cairo, Egypt\"\n}" } } },
+        { "name": "Get Service By ID", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/workers/service/:serviceId" } },
+        { "name": "Get Worker By ID", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/workers/:id" } },
+        { "name": "Get Worker Reviews", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/workers/:id/reviews" } }
+      ]
+    },
+    {
+      "name": "Customers (Public)",
+      "item": [
+        { "name": "Get Customer By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/:id" } },
+        { "name": "Get Customer Reviews", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/:id/reviews" } }
+      ]
+    },
+    {
+      "name": "Customer Profile",
+      "item": [
+        { "name": "Get Profile", "request": { "method": "GET", "url": "{{baseUrl}}/api/customer/profile" } },
+        { "name": "Update Profile", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/profile", "body": { "mode": "raw", "raw": "{\n  \"name\": \"New Name\",\n  \"phone\": \"+201000000000\"\n}" } } },
+        { "name": "Get Orders", "request": { "method": "GET", "url": "{{baseUrl}}/api/customer/orders" } },
+        { "name": "Add Address", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/addresses", "body": { "mode": "raw", "raw": "{\n  \"label\": \"Home\",\n  \"street\": \"123 Main St\",\n  \"city\": \"Cairo\"\n}" } } },
+        { "name": "Update Address", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/addresses/:id", "body": { "mode": "raw", "raw": "{\n  \"label\": \"Work\"\n}" } } },
+        { "name": "Delete Address", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/customer/addresses/:id" } },
+        { "name": "Toggle Favorite Worker", "request": { "method": "POST", "url": "{{baseUrl}}/api/customer/favorites/workers/:workerId" } }
+      ]
+    },
+    {
+      "name": "Customer Settings",
+      "item": [
+        { "name": "Get Payment Methods", "request": { "method": "GET", "url": "{{baseUrl}}/api/customer/payment-methods" } },
+        { "name": "Add Payment Method", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/payment-methods", "body": { "mode": "raw", "raw": "{\n  \"cardNumber\": \"4242424242424242\",\n  \"holder\": \"Test User\",\n  \"expMonth\": 12,\n  \"expYear\": 2030\n}" } } },
+        { "name": "Delete Payment Method", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/customer/payment-methods/:id" } },
+        { "name": "Set Default Payment Method", "request": { "method": "PUT", "url": "{{baseUrl}}/api/customer/payment-methods/:id/default" } },
+        { "name": "Get Notification Preferences", "request": { "method": "GET", "url": "{{baseUrl}}/api/customer/notifications/preferences" } },
+        { "name": "Update Notification Preferences", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/notifications/preferences", "body": { "mode": "raw", "raw": "{\n  \"email\": true,\n  \"sms\": false,\n  \"push\": true\n}" } } }
+      ]
+    },
+    {
+      "name": "Favorites",
+      "item": [
+        { "name": "List Favorites", "request": { "method": "GET", "url": "{{baseUrl}}/api/favorites" } },
+        { "name": "Add Favorite", "request": { "method": "POST", "url": "{{baseUrl}}/api/favorites/:workerId" } },
+        { "name": "Remove Favorite", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/favorites/:workerId" } }
+      ]
+    },
+    {
+      "name": "Worker Dashboard",
+      "item": [
+        { "name": "Get Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/api/worker/dashboard" } },
+        { "name": "Update Worker Profile", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/profile", "body": { "mode": "raw", "raw": "{\n  \"bio\": \"Experienced plumber\",\n  \"yearsOfExperience\": 5\n}" } } },
+        { "name": "Get My Services", "request": { "method": "GET", "url": "{{baseUrl}}/api/worker/services" } },
+        { "name": "Add Service", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/services", "body": { "mode": "raw", "raw": "{\n  \"title\": \"Pipe repair\",\n  \"price\": 200,\n  \"category\": \"CATEGORY_ID\"\n}" } } },
+        { "name": "Update Service", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/services/:serviceId", "body": { "mode": "raw", "raw": "{\n  \"price\": 250\n}" } } },
+        { "name": "Delete Service", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/worker/services/:serviceId" } },
+        { "name": "Get My Orders", "request": { "method": "GET", "url": "{{baseUrl}}/api/worker/orders" } },
+        { "name": "Get Wallet", "request": { "method": "GET", "url": "{{baseUrl}}/api/worker/wallet" } },
+        { "name": "Add License", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/licenses", "body": { "mode": "raw", "raw": "{\n  \"type\": \"professional\",\n  \"fileUrl\": \"https://...\"\n}" } } },
+        { "name": "Update License", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/licenses/:licenseId", "body": { "mode": "raw", "raw": "{\n  \"fileUrl\": \"https://...\"\n}" } } },
+        { "name": "Delete License", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/worker/licenses/:licenseId" } },
+        { "name": "Toggle License Active", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/licenses/:licenseId/active", "body": { "mode": "raw", "raw": "{\n  \"active\": true\n}" } } }
+      ]
+    },
+    {
+      "name": "Provider Applications",
+      "item": [
+        { "name": "Submit Application", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/provider-applications", "body": { "mode": "raw", "raw": "{\n  \"categoryId\": \"CATEGORY_ID\",\n  \"bio\": \"...\",\n  \"licenses\": []\n}" } } },
+        { "name": "Get My Application", "request": { "method": "GET", "url": "{{baseUrl}}/api/provider-applications/me" } },
+        { "name": "List Applications (admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/provider-applications" } },
+        { "name": "Approve Application (admin)", "request": { "method": "PUT", "url": "{{baseUrl}}/api/provider-applications/:id/approve" } },
+        { "name": "Reject Application (admin)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/provider-applications/:id/reject", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Incomplete info\"\n}" } } }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        { "name": "Get Stats", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/stats" } },
+        { "name": "Get Users", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/users" } },
+        { "name": "Get User By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/users/:id" } },
+        { "name": "Update User Status", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/users/:id/status", "body": { "mode": "raw", "raw": "{\n  \"status\": \"banned\"\n}" } } },
+        { "name": "Get Verification Requests", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/verification-requests" } },
+        { "name": "Handle Verification", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/verification/:id", "body": { "mode": "raw", "raw": "{\n  \"action\": \"approve\"\n}" } } },
+        { "name": "Get Reports", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/reports" } },
+        { "name": "Update Report", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/reports/:id", "body": { "mode": "raw", "raw": "{\n  \"status\": \"resolved\"\n}" } } },
+        { "name": "Get Orders (admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/orders" } },
+        { "name": "Update Order Status (admin)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/orders/:id/status", "body": { "mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}" } } },
+        { "name": "Get Pending Services", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/pending-services" } },
+        { "name": "Approve Service", "request": { "method": "PUT", "url": "{{baseUrl}}/api/admin/services/:id/approve" } },
+        { "name": "Reject Service", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/services/:id/reject", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Incomplete info\"\n}" } } },
+        { "name": "Get Licenses", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/licenses" } },
+        { "name": "Approve License", "request": { "method": "PUT", "url": "{{baseUrl}}/api/admin/licenses/:licenseId/approve" } },
+        { "name": "Reject License", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/licenses/:licenseId/reject", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Invalid document\"\n}" } } },
+        { "name": "List All Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/tickets" } },
+        { "name": "Update Ticket Status (admin)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/admin/tickets/:id/status", "body": { "mode": "raw", "raw": "{\n  \"status\": \"closed\"\n}" } } }
+      ]
+    },
+    {
+      "name": "Admin Analytics",
+      "description": "All endpoints accept ?range=today|7d|30d|90d|all.",
+      "item": [
+        { "name": "Overview", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/admin/analytics/overview?range=30d", "host": ["{{baseUrl}}"], "path": ["api","admin","analytics","overview"], "query": [{"key":"range","value":"30d"}] } } },
+        { "name": "Orders Trend", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/admin/analytics/orders-trend?range=30d", "host": ["{{baseUrl}}"], "path": ["api","admin","analytics","orders-trend"], "query": [{"key":"range","value":"30d"}] } } },
+        { "name": "Orders Status", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/orders-status" } },
+        { "name": "Top Categories", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/top-categories" } },
+        { "name": "Top Services", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/top-services" } },
+        { "name": "Top Workers", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/top-workers" } },
+        { "name": "Cancellation Reasons", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/cancellation-reasons" } },
+        { "name": "Orders By Governorate", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/orders-by-governorate" } },
+        { "name": "Orders By City", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/orders-by-city" } },
+        { "name": "Demand-Supply Gap", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/demand-supply-gap" } },
+        { "name": "Top Customers", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/top-customers" } },
+        { "name": "Customer Retention", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/customer-retention" } },
+        { "name": "Revenue Trend", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/revenue-trend" } },
+        { "name": "Revenue Split", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/revenue-split" } },
+        { "name": "Payment Methods", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/payment-methods" } },
+        { "name": "Refund Rate", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/refund-rate" } },
+        { "name": "Coupons Analytics", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/coupons" } },
+        { "name": "Top Search Terms", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/top-search-terms" } },
+        { "name": "Reports By Category", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/reports-by-category" } },
+        { "name": "Avg Completion Time", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/analytics/avg-completion-time" } }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        { "name": "Suggest", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/search/suggest?q=plumb", "host": ["{{baseUrl}}"], "path": ["api","search","suggest"], "query": [{"key":"q","value":"plumb"}] } } },
+        { "name": "Log Search", "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/search/log", "body": { "mode": "raw", "raw": "{\n  \"query\": \"plumber\"\n}" } } },
+        { "name": "Top Searches", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/search/top" } }
+      ]
+    },
+    {
+      "name": "Coupons",
+      "item": [
+        { "name": "Get Featured", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/coupons/featured" } },
+        { "name": "Validate Coupon", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/coupons/validate", "body": { "mode": "raw", "raw": "{\n  \"code\": \"SAVE10\"\n}" } } },
+        { "name": "List Coupons (admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/coupons" } },
+        { "name": "Get Stats (admin)", "request": { "method": "GET", "url": "{{baseUrl}}/api/coupons/stats" } },
+        { "name": "Create Coupon (admin)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/coupons", "body": { "mode": "raw", "raw": "{\n  \"code\": \"SAVE10\",\n  \"percent\": 10,\n  \"expiresAt\": \"2026-12-31\"\n}" } } },
+        { "name": "Update Coupon (admin)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/coupons/:id", "body": { "mode": "raw", "raw": "{\n  \"percent\": 15\n}" } } },
+        { "name": "Delete Coupon (admin)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/coupons/:id" } }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        { "name": "List Conversations", "request": { "method": "GET", "url": "{{baseUrl}}/api/chat/conversations" } },
+        { "name": "Find Or Create Conversation", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/chat/conversations", "body": { "mode": "raw", "raw": "{\n  \"otherUserId\": \"USER_ID\"\n}" } } },
+        { "name": "Get Conversation", "request": { "method": "GET", "url": "{{baseUrl}}/api/chat/conversations/:id" } },
+        { "name": "Get Messages", "request": { "method": "GET", "url": "{{baseUrl}}/api/chat/conversations/:id/messages" } },
+        { "name": "Get Unread Total", "request": { "method": "GET", "url": "{{baseUrl}}/api/chat/unread-total" } }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        { "name": "Create Order (customer)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/orders", "body": { "mode": "raw", "raw": "{\n  \"workerId\": \"WORKER_ID\",\n  \"serviceId\": \"SERVICE_ID\",\n  \"addressId\": \"ADDRESS_ID\",\n  \"scheduledFor\": \"2026-05-10T10:00:00Z\"\n}" } } },
+        { "name": "Cancel Order (customer)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/customer/orders/:id/cancel", "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Plans changed\"\n}" } } },
+        { "name": "Update Order Status (worker)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/orders/:id/status", "body": { "mode": "raw", "raw": "{\n  \"status\": \"accepted\"\n}" } } },
+        { "name": "Respond To Cancellation (worker)", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/worker/orders/:id/cancellation", "body": { "mode": "raw", "raw": "{\n  \"approve\": true\n}" } } }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        { "name": "Create Review", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/reviews", "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"ORDER_ID\",\n  \"rating\": 5,\n  \"comment\": \"Great work!\"\n}" } } }
+      ]
+    },
+    {
+      "name": "Support",
+      "item": [
+        { "name": "Create Ticket", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/support/tickets", "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Issue with order\",\n  \"message\": \"Worker did not show up\"\n}" } } },
+        { "name": "List My Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/support/tickets" } },
+        { "name": "Get Ticket", "request": { "method": "GET", "url": "{{baseUrl}}/api/support/tickets/:id" } },
+        { "name": "Add Reply", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/api/support/tickets/:id/reply", "body": { "mode": "raw", "raw": "{\n  \"message\": \"Any update?\"\n}" } } }
+      ]
+    }
+  ]
+}
