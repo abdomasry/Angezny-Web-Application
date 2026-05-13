@@ -5,6 +5,7 @@ const ServiceRequest = require("../models/Service.Request");
 const User = require("../models/User.Model");
 const Notification = require("../models/Notification");
 const WalletTransaction = require("../models/Wallet.Transaction");
+const Review = require("../models/Review");
 const { parsePagination, paginationMeta } = require("../lib/pagination");
 
 const populateWorkerProfile = (query, { publicServices = false } = {}) =>
@@ -609,8 +610,34 @@ const getMyOrders = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    // Decorate each completed order with whether the worker already submitted
+    // a worker→customer review. The dashboard uses this to permanently flip
+    // the "قيم العميل" button to a "تم التقييم" label after a page reload,
+    // not just within the current session.
+    //
+    // Only the "history" tab can possibly contain reviewable orders (status
+    // must be "completed"), so we only run the lookup when we expect hits.
+    const completedIds = orders
+      .filter((o) => o.status === "completed")
+      .map((o) => o._id);
+    let reviewedSet = new Set();
+    if (completedIds.length > 0) {
+      const existing = await Review.find({
+        serviceRequestId: { $in: completedIds },
+        direction: "worker_to_customer",
+        workerId: userId,
+      }).select("serviceRequestId");
+      reviewedSet = new Set(existing.map((r) => String(r.serviceRequestId)));
+    }
+
+    const ordersOut = orders.map((o) => {
+      const obj = o.toObject();
+      obj.hasWorkerReview = reviewedSet.has(String(o._id));
+      return obj;
+    });
+
     res.json({
-      orders,
+      orders: ordersOut,
       pagination: paginationMeta({ page, limit, total }),
     });
   } catch (error) {

@@ -47,9 +47,7 @@ async function cleanupBrokenGeoDocs() {
         customerCount++
       }
     }
-    if (customerCount > 0) {
-      console.log(`Cleaned ${customerCount} customer profile(s) with broken geo points`)
-    }
+
   } catch (err) {
     // Cleanup failures are non-fatal — we'd rather the server start with
     // (some) broken docs than refuse to boot. The error log surfaces it.

@@ -9,6 +9,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/User.Model");
 const Review = require("../models/Review");
+const ServiceRequest = require("../models/Service.Request");
 const { parsePagination, paginationMeta } = require("../lib/pagination");
 
 const ensureWorkerOrAdmin = (req, res) => {
@@ -32,6 +33,26 @@ const getCustomerById = async (req, res) => {
     if (!user || user.role !== "customer") {
       return res.status(404).json({ message: "Customer not found" });
     }
+
+    // Order counts — single aggregation gives us both numbers in one round-trip.
+    // We surface "completed" separately because workers care most about that
+    // (it's the volume of finished business), and "total" includes every state
+    // the customer has ever placed (pending, accepted, rejected, etc.).
+    const counts = await ServiceRequest.aggregate([
+      { $match: { customerId: new mongoose.Types.ObjectId(req.params.id) } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+    const totalOrders = counts[0]?.total || 0;
+    const completedOrders = counts[0]?.completed || 0;
+
     res.json({
       customer: {
         _id: user._id,
@@ -41,6 +62,8 @@ const getCustomerById = async (req, res) => {
         createdAt: user.createdAt,
         customerRatingAverage: user.customerRatingAverage || 0,
         customerTotalReviews: user.customerTotalReviews || 0,
+        totalOrders,
+        completedOrders,
       },
     });
   } catch (err) {

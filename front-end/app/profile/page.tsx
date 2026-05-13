@@ -3,8 +3,6 @@
 // =============================================================================
 // CUSTOMER PROFILE PAGE — /profile
 // =============================================================================
-// Rebuilt to match the Stitch enhanced_customer_profile_desktop design:
-// top header → 2-col grid (sidebar nav + stacked sections).
 //
 // Sections (anchor-scrolled from the sidebar):
 //   1. overview     — profile header card + personal info + favorites
@@ -12,11 +10,6 @@
 //   3. payment      — payment methods (Visa/Mastercard/ميزة) CRUD
 //   4. orders       — order history with in-progress/history tabs
 //   5. settings     — notification prefs + danger zone link
-//
-// "Save changes" header button batches name/phone/language/favorites
-// into a single PUT /api/customer/profile call. Inputs that are not
-// part of that batch (addresses, payment methods, notifications)
-// save themselves on commit.
 // =============================================================================
 
 import { useState, useEffect, useRef } from 'react'
@@ -33,6 +26,7 @@ import CancelOrderModal from '@/components/CancelOrderModal'
 import ReviewOrderModal from '@/components/ReviewOrderModal'
 import AddressPicker, { type PickedAddress } from '@/components/AddressPicker/AddressPicker'
 import { useAuth } from '@/lib/auth-context'
+import { useFavorites } from '@/lib/favorites-context'
 import { api } from '@/lib/api'
 import { uploadChatFile } from '@/lib/upload'
 import type {
@@ -77,6 +71,7 @@ const EMPTY_ADDRESS: AddressDraft = {
 
 export default function ProfilePage() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
+  const { ids: favoriteIds } = useFavorites()
   const router = useRouter()
 
   // ─── Page-level state ───────────────────────────────────────────
@@ -488,28 +483,19 @@ export default function ProfilePage() {
                         <p className="text-lg font-bold">{profile?.numberOfOrders ?? 0}</p>
                       </div>
                     </div>
-                    <div className="bg-surface-container-low px-4 py-3 rounded-2xl flex items-center gap-3">
+                    <Link
+                      href="/favorites"
+                      className="bg-surface-container-low px-4 py-3 rounded-2xl flex items-center gap-3 hover:bg-surface-container-high transition-colors"
+                    >
                       <div className="bg-rose-100 p-2 rounded-full text-rose-700">
                         <Heart className="w-5 h-5" />
                       </div>
                       <div>
                         <p className="text-xs text-on-surface-variant font-medium">العمال المفضلين</p>
-                        <p className="text-lg font-bold">{profile?.favoriteWorkers?.length ?? 0}</p>
+                        <p className="text-lg font-bold">{favoriteIds.size}</p>
                       </div>
-                    </div>
-                    <div className="bg-surface-container-low px-4 py-3 rounded-2xl flex items-center gap-3">
-                      <div className="bg-amber-100 p-2 rounded-full text-amber-700">
-                        <Star className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-on-surface-variant font-medium">تقييمك كعميل</p>
-                        <p className="text-lg font-bold">
-                          {profile?.totalRatings && profile.totalRatings > 0
-                            ? (profile.ratingAverage || 0).toFixed(1)
-                            : '—'}
-                        </p>
-                      </div>
-                    </div>
+                    </Link>
+                    
                   </div>
                 </div>
               </section>
@@ -980,28 +966,7 @@ export default function ProfilePage() {
                   إعدادات الحساب
                 </h2>
 
-                <div className="space-y-3">
-                  <h3 className="font-bold text-on-surface flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-primary" />
-                    الإشعارات
-                  </h3>
-                  {[
-                    { key: 'orders' as const, label: 'إشعارات الطلبات' },
-                    { key: 'messages' as const, label: 'إشعارات الرسائل' },
-                    { key: 'promotions' as const, label: 'العروض والإعلانات' },
-                  ].map(item => (
-                    <label key={item.key} className="flex items-center justify-between bg-surface-container-low rounded-xl p-4 cursor-pointer">
-                      <span className="font-medium text-sm">{item.label}</span>
-                      <input
-                        type="checkbox"
-                        checked={notifPrefs[item.key]}
-                        onChange={() => handleToggleNotif(item.key)}
-                        className="w-5 h-5 accent-primary"
-                      />
-                    </label>
-                  ))}
-                </div>
-
+                
                 <Link
                   href="/profile/edit"
                   className="inline-flex items-center gap-2 bg-primary/5 text-primary px-4 py-3 rounded-xl font-bold hover:bg-primary/10"

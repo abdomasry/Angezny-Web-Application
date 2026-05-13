@@ -3,24 +3,6 @@
 // =============================================================================
 // CHECKOUT PAGE — /checkout?service=<serviceId>
 // =============================================================================
-// Landing spot when a customer clicks "اطلب الآن" on a specific service.
-//
-// Flow:
-//   1. Read ?service=<id> from URL.
-//   2. Fetch the service (name, price, worker) via GET /api/workers/service/:id.
-//   3. Fetch saved payment cards for the card-mode UI (disabled for now).
-//   4. Customer fills: scheduledDate, address, notes, paymentMode, couponCode.
-//   5. POST /api/customer/orders → ServiceRequest(status=pending).
-//   6. Redirect to /profile where the order shows under "قيد التنفيذ".
-//
-// Form state migrated to react-hook-form + zod (checkoutSchema). Coupon flow
-// stays as separate component state — the apply/remove cycle is async and
-// orthogonal to the main form submission, so it doesn't fit RHF cleanly.
-//
-// Payment is cash-on-delivery only for now. The card radio is visible but
-// disabled with a "قريباً" badge — the full card UI stays in the markup so
-// a future Stripe/Paymob wiring is a small swap, not a rewrite.
-// =============================================================================
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'

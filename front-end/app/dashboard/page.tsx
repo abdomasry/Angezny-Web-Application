@@ -7,13 +7,11 @@
  * It follows the same sidebar + main-content layout as the customer /profile page,
  * but tailored for workers: managing services, viewing incoming orders, and tracking earnings.
  *
- * The page has 3 tabs:
- *   1. "خدماتي" (My Services) — CRUD for worker's services
- *   2. "طلبات قيد التنفيذ" (Active Orders) — orders currently being worked on
- *   3. "سجل الطلبات" (Order History) — completed/cancelled/rejected orders
+
  */
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Pencil, Trash2, Briefcase, ShoppingBag, DollarSign,
@@ -2307,29 +2305,32 @@ export default function WorkerDashboardPage() {
 
                           {/* Middle row: customer info + date + price + payment mode */}
                           <div className="flex items-center gap-6 flex-wrap mb-3">
-                            {/* Customer */}
-                            <div className="flex items-center gap-2">
-                              {order.customerId ? (
-                                <>
-                                  {order.customerId.profileImage ? (
-                                    <img
-                                      src={order.customerId.profileImage}
-                                      alt=""
-                                      className="w-6 h-6 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
-                                      {order.customerId.firstName?.charAt(0)}
-                                    </div>
-                                  )}
-                                  <span className="text-sm text-on-surface-variant">
-                                    {order.customerId.firstName} {order.customerId.lastName}
-                                  </span>
-                                </>
-                              ) : (
+                            {/* Customer — clickable, opens the worker-only customer profile */}
+                            {order.customerId ? (
+                              <Link
+                                href={`/customer/${order.customerId._id}`}
+                                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                              >
+                                {order.customerId.profileImage ? (
+                                  <img
+                                    src={order.customerId.profileImage}
+                                    alt=""
+                                    className="w-6 h-6 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
+                                    {order.customerId.firstName?.charAt(0)}
+                                  </div>
+                                )}
+                                <span className="text-sm text-on-surface-variant hover:text-primary hover:underline">
+                                  {order.customerId.firstName} {order.customerId.lastName}
+                                </span>
+                              </Link>
+                            ) : (
+                              <div className="flex items-center gap-2">
                                 <span className="text-sm text-on-surface-variant/60">عميل غير معروف</span>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
                             {/* Order date */}
                             <div className="flex items-center gap-1 text-sm text-on-surface-variant">
@@ -2445,8 +2446,11 @@ export default function WorkerDashboardPage() {
                           {order.status === 'completed' && order.customerId && (
                             <div className="pt-3 mt-3 border-t border-outline-variant/10 flex items-center justify-between gap-3">
                               <span className="text-sm text-on-surface-variant">قيّم تجربتك مع هذا العميل</span>
-                              {reviewedOrderIds.has(order._id) ? (
-                                <span className="text-sm text-on-surface-variant px-3 py-2 rounded-lg bg-surface-container-low">
+                              {/* Server-side `hasWorkerReview` is the source of truth across page
+                                  reloads. `reviewedOrderIds` is the in-session add-on for orders
+                                  just rated without a refetch. Either being true locks the button. */}
+                              {(order.hasWorkerReview || reviewedOrderIds.has(order._id)) ? (
+                                <span className="text-sm text-on-surface-variant px-3 py-2 rounded-lg bg-surface-container-low cursor-not-allowed">
                                   تم التقييم
                                 </span>
                               ) : (

@@ -734,9 +734,6 @@ export default function AdminDashboardPage() {
     { key: 'provider-applications', label: 'طلبات الانضمام', icon: Briefcase },
     { key: 'support', label: 'بلاغات الدعم', icon: LifeBuoy },
     { key: 'coupons', label: 'أكواد الخصم', icon: Ticket },
-    { key: 'schedule', label: 'الجدول الزمني', icon: CalendarDays },
-    { key: 'users', label: 'إدارة المستخدمين', icon: Users },
-    { key: 'settings', label: 'الإعدادات', icon: Settings },
   ]
 
   // ===========================================================================
@@ -843,14 +840,7 @@ export default function AdminDashboardPage() {
           })}
         </nav>
 
-        {/* --- Bottom Section: Add Service + Logout --- */}
         <div className="p-4 space-y-2 border-t border-outline-variant/15">
-          {/* Add new service button */}
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-on-primary font-medium text-sm hover:bg-primary-container transition-colors">
-            <Plus className="w-5 h-5" />
-            <span>إضافة خدمة جديدة</span>
-          </button>
-
           {/* Logout button */}
           <button
             onClick={logout}

@@ -1,17 +1,6 @@
 'use client'
 
 // /become-provider — application form for customers who want to upgrade
-// to a service provider (worker). On approval, the admin flips the user's
-// role and creates a WorkerProfile + initial services automatically.
-//
-// Flow:
-//   1. Mount → GET /provider-applications/me
-//        - null  → render the form
-//        - status "pending"   → show waiting card
-//        - status "approved"  → show success card + link to dashboard
-//        - status "rejected"  → show rejection reason + "re-apply" button
-//   2. Submit → POST /provider-applications. After success, switch to the
-//      pending card without a full reload.
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'

@@ -1,14 +1,5 @@
 'use client'
 
-// Services listing page — "Elite service providers" layout.
-// Horizontal worker cards with image on the left, content on the right.
-// Left sidebar has multi-select category filter with counts, price range,
-// rating radio, and availability checkboxes.
-//
-// URL params understood:
-//   ?category=<id1,id2,...>   — from home page / navbar autocomplete / sidebar
-//   ?q=<service name>         — from navbar autocomplete text search
-//
 // Backend endpoint: GET /api/workers (see worker.controller.js for filter logic)
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
@@ -34,6 +25,8 @@ import {
 } from '@/lib/queries'
 import type { WorkerProfile, WorkerService } from '@/lib/types'
 import { useUserLocation } from '@/hooks/useUserLocation'
+import { useCustomerOrigin } from '@/hooks/useCustomerOrigin'
+import { coordsFromPoint, formatDistance, haversineKm } from '@/lib/distance'
 
 // Availability options — UI is wired but the filter is cosmetic until the
 // backend has a real availability field on WorkerProfile. Selecting these
@@ -101,6 +94,20 @@ function ServicesContent() {
   // policy. `geoCursor` is the meters+id pair returned by the previous page;
   // it stays null on page 1 so the backend also returns the no-coords tail.
   const { coords, status: geoStatus, request: requestLocation } = useUserLocation()
+  // Customer's saved profile pin — used to display "3.5KM" / "400M" next to
+  // each worker's address regardless of the current sort. Falls back to null
+  // when the customer hasn't saved an address (or isn't logged in), in which
+  // case we just hide the distance label.
+  const customerOrigin = useCustomerOrigin()
+  const distanceFor = (worker: WorkerProfile): string => {
+    // Prefer the server-computed distance when the listing was fetched in geo
+    // mode (it already accounts for the same origin we'd compute below).
+    if (typeof worker.distanceKm === 'number') return formatDistance(worker.distanceKm)
+    if (!customerOrigin) return ''
+    const target = coordsFromPoint(worker.location?.point)
+    if (!target) return ''
+    return formatDistance(haversineKm(customerOrigin, target))
+  }
   const [geoCursor, setGeoCursor] = useState<{ afterDistance: number; afterId: string } | null>(null)
   const [geoAccumulated, setGeoAccumulated] = useState<WorkerProfile[]>([])
   const wantsNearest = sort === 'nearest'
@@ -521,19 +528,15 @@ function ServicesContent() {
                             <Clock className="w-3.5 h-3.5" />
                             <span>&lt; 30 دقيقة</span>
                           </span>
-                          {worker.location?.address && (
+                          {(worker.location?.address || distanceFor(worker)) && (
                             <span className="flex items-center gap-1.5">
                               <MapPin className="w-3.5 h-3.5" />
-                              <span>{worker.location.address}</span>
-                            </span>
-                          )}
-                          {/* Distance — only present when fetched in geo mode.
-                              Highlighted (primary color, bold) so the user can
-                              see at a glance why the order looks the way it does. */}
-                          {typeof worker.distanceKm === 'number' && (
-                            <span className="flex items-center gap-1.5 text-primary font-bold">
-                              <MapPin className="w-3.5 h-3.5" />
-                              <span>{worker.distanceKm.toFixed(1)} كم</span>
+                              {worker.location?.address && <span>{worker.location.address}</span>}
+                              {distanceFor(worker) && (
+                                <span className="text-primary font-bold">
+                                  {worker.location?.address ? '· ' : ''}{distanceFor(worker)}
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>
@@ -867,29 +870,7 @@ function ServicesContent() {
                 </div>
               </div>
 
-              {/* Availability checkboxes (UI-only — see note at top of file) */}
-              <div className="mb-6">
-                <label className="block text-sm font-bold mb-3 text-right">التوفر</label>
-                <div className="space-y-2.5">
-                  {[
-                    { value: 'available_now' as const,   label: 'متاح الآن' },
-                    { value: 'responds_hour' as const,   label: 'يستجيب خلال ساعة' },
-                    { value: 'emergency_24_7' as const,  label: 'طوارئ 24/7' },
-                  ].map(opt => (
-                    <label key={opt.value} className="flex items-center justify-end gap-2 cursor-pointer group">
-                      <span className="text-sm text-on-surface-variant group-hover:text-primary transition-colors">
-                        {opt.label}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={availability.includes(opt.value)}
-                        onChange={() => toggleAvailability(opt.value)}
-                        className="w-4 h-4 text-primary rounded focus:ring-primary/20"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
+             
 
               {/* Apply button — filters apply live but the button scrolls the user up */}
               <button

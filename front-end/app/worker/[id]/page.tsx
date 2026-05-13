@@ -33,6 +33,8 @@ import HeartButton from '@/components/HeartButton'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useChat } from '@/lib/chat-context'
+import { useCustomerOrigin } from '@/hooks/useCustomerOrigin'
+import { coordsFromPoint, formatDistance, haversineKm } from '@/lib/distance'
 import type { WorkerProfile, WorkerService, Review, PaginationInfo, PortfolioItem } from '@/lib/types'
 
 const DAY_NAMES_AR: Record<string, string> = {
@@ -153,6 +155,14 @@ export default function WorkerProfilePage() {
   // ---------------------------------------------------------------------------
   // worker: The full worker profile data (null until loaded)
   const [worker, setWorker] = useState<WorkerProfileExtended | null>(null)
+
+  // Customer's saved profile pin — used to render a "3.5KM" / "400M" label
+  // next to the worker's address. Hidden when either side has no coordinates.
+  const customerOrigin = useCustomerOrigin()
+  const workerCoords = coordsFromPoint(worker?.location?.point)
+  const distanceLabel = customerOrigin && workerCoords
+    ? formatDistance(haversineKm(customerOrigin, workerCoords))
+    : ''
 
   // reviews: Array of review objects for the Reviews tab
   const [reviews, setReviews] = useState<Review[]>([])
@@ -923,10 +933,15 @@ export default function WorkerProfilePage() {
                   <span className="font-bold text-white text-lg">{worker.ratingAverage?.toFixed(1) || '0.0'}</span>
                   <span>({worker.totalReviews} تقييم)</span>
                 </div>
-                {worker.location?.address && (
+                {(worker.location?.address || distanceLabel) && (
                   <div className="flex items-center gap-2">
                     <MapPin className="w-5 h-5" />
-                    <span>{worker.location.address}</span>
+                    {worker.location?.address && <span>{worker.location.address}</span>}
+                    {distanceLabel && (
+                      <span className="font-bold text-yellow-300">
+                        {worker.location?.address ? '· ' : ''}{distanceLabel}
+                      </span>
+                    )}
                   </div>
                 )}
                 {memberYear && (

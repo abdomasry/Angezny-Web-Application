@@ -235,6 +235,11 @@ export interface CustomerProfileData {
 // Service request / order — used in customer order cards
 export interface ServiceRequest {
   _id: string
+  // Set by `getMyOrders` (worker-dashboard.controller) on completed orders.
+  // True when the worker has already submitted a worker→customer review for
+  // this order — the dashboard uses it to permanently lock the
+  // "قيم العميل" button across page reloads.
+  hasWorkerReview?: boolean
   customerId: string
   workerId?: {
     _id: string
@@ -397,6 +402,11 @@ export interface WorkerServiceRequest {
   scheduledDate?: string
   completedAt?: string
   createdAt: string
+  // True when the worker has already submitted their post-completion rating
+  // of the customer. Persisted on the order so the "rate customer" CTA stays
+  // locked across reloads, even if the in-memory `reviewedOrderIds` set is
+  // empty after a navigation.
+  hasWorkerReview?: boolean
 }
 
 // Admin dashboard stats — platform-wide counts
@@ -539,6 +549,8 @@ export interface CustomerPublicProfile {
   createdAt: string
   customerRatingAverage: number
   customerTotalReviews: number
+  totalOrders: number
+  completedOrders: number
 }
 
 export interface CustomerReview {

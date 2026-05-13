@@ -3,14 +3,10 @@
 // =============================================================================
 // PUBLIC CUSTOMER PROFILE — /customer/[id]
 // =============================================================================
-// Visible ONLY to logged-in workers (and admins). Customers (including the
-// owner) get a 403 view — the whole point is that workers can see customer
-// reviews without the customer themselves seeing them.
-// =============================================================================
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
-import { Star, Calendar, ChevronLeft, ChevronRight, MessageSquare, ShieldOff } from 'lucide-react'
+import { Star, Calendar, ChevronLeft, ChevronRight, MessageSquare, ShieldOff, ShoppingBag, CheckCircle } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -156,6 +152,16 @@ export default function CustomerProfilePage() {
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   <span className="font-bold text-lg">{customer.customerRatingAverage.toFixed(1)}</span>
                   <span>({customer.customerTotalReviews} تقييم)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5" />
+                  <span className="font-bold text-lg">{customer.totalOrders}</span>
+                  <span>طلبات</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-bold text-lg">{customer.completedOrders}</span>
+                  <span>مكتملة</span>
                 </div>
                 {memberYear && (
                   <div className="flex items-center gap-2">
