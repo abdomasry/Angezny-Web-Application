@@ -11,6 +11,7 @@
 
 import { useState } from 'react'
 import { Star, Loader2, X as XIcon, AlertCircle, Send } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { api } from '@/lib/api'
 
 interface Props {
@@ -33,6 +34,7 @@ export default function ReviewOrderModal({
   onClose,
   onDone,
 }: Props) {
+  const t = useTranslations('reviewOrderModal')
   // We keep a separate `hovered` so the stars preview as the user moves the
   // mouse, falling back to the committed `rating` state when not hovering.
   const [rating, setRating] = useState(0)
@@ -47,7 +49,7 @@ export default function ReviewOrderModal({
     e.preventDefault()
     setError('')
     if (!rating) {
-      setError('يرجى اختيار تقييم من 1 إلى 5 نجوم')
+      setError(t('selectRating'))
       return
     }
     setSubmitting(true)
@@ -59,7 +61,7 @@ export default function ReviewOrderModal({
       })
       onDone(data.review)
     } catch (err: any) {
-      setError(err?.message || 'تعذّر إرسال التقييم')
+      setError(err?.message || t('failed'))
     } finally {
       setSubmitting(false)
     }
@@ -68,12 +70,12 @@ export default function ReviewOrderModal({
   // Friendly label that changes with the selected rating. Gives the star
   // picker a clear "what does 4 mean here" hint instead of leaving it numeric.
   const ratingLabel = (n: number) => {
-    if (n >= 5) return 'ممتاز'
-    if (n >= 4) return 'جيد جداً'
-    if (n >= 3) return 'جيد'
-    if (n >= 2) return 'مقبول'
-    if (n >= 1) return 'سيء'
-    return 'اختر تقييمك'
+    if (n >= 5) return t('ratingExcellent')
+    if (n >= 4) return t('ratingVeryGood')
+    if (n >= 3) return t('ratingGood')
+    if (n >= 2) return t('ratingFair')
+    if (n >= 1) return t('ratingPoor')
+    return t('ratingChoose')
   }
 
   return (
@@ -85,7 +87,7 @@ export default function ReviewOrderModal({
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-outline-variant/10">
           <div>
-            <h2 className="text-xl font-black text-on-surface">تقييم الخدمة</h2>
+            <h2 className="text-xl font-black text-on-surface">{t('title')}</h2>
             <p className="text-sm text-on-surface-variant mt-1">
               {serviceName && <>{serviceName}</>}
               {workerName && <span> • {workerName}</span>}
@@ -105,7 +107,7 @@ export default function ReviewOrderModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Star picker — row of 5, click to commit, hover to preview. */}
           <div className="text-center">
-            <p className="text-sm text-on-surface-variant mb-3">كم ترشّح هذه الخدمة؟</p>
+            <p className="text-sm text-on-surface-variant mb-3">{t('prompt')}</p>
             <div className="flex items-center justify-center gap-2" dir="ltr">
               {[1, 2, 3, 4, 5].map(n => (
                 <button
@@ -115,7 +117,7 @@ export default function ReviewOrderModal({
                   onMouseEnter={() => setHovered(n)}
                   onMouseLeave={() => setHovered(0)}
                   className="p-1 transition-transform hover:scale-110"
-                  aria-label={`${n} نجوم`}
+                  aria-label={t('starsAria', { n })}
                 >
                   <Star
                     className={`w-10 h-10 transition-colors ${
@@ -137,14 +139,14 @@ export default function ReviewOrderModal({
           {/* Comment */}
           <div>
             <label className="block text-sm font-bold text-on-surface mb-2">
-              تعليقك (اختياري)
+              {t('commentLabel')}
             </label>
             <textarea
               value={comment}
               onChange={e => setComment(e.target.value)}
               rows={4}
               maxLength={1000}
-              placeholder="شارك تجربتك مع الحرفي — جودة العمل، الالتزام بالوقت، الاحترافية..."
+              placeholder={t('commentPlaceholder')}
               className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none"
             />
             <p className="text-xs text-on-surface-variant mt-1 text-left">
@@ -168,7 +170,7 @@ export default function ReviewOrderModal({
               disabled={submitting}
               className="px-5 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface font-semibold hover:bg-surface-container-high disabled:opacity-50"
             >
-              لاحقاً
+              {t('later')}
             </button>
             <button
               type="submit"
@@ -178,12 +180,12 @@ export default function ReviewOrderModal({
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  جاري الإرسال...
+                  {t('sending')}
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  إرسال التقييم
+                  {t('send')}
                 </>
               )}
             </button>

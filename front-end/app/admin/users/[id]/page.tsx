@@ -86,11 +86,11 @@ export default function AdminUserDetailsPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 px-6 max-w-5xl mx-auto">
+        <div className="pt-24 px-4 sm:px-6 max-w-5xl mx-auto">
           <div className="space-y-6">
             <div className="h-8 w-48 bg-surface-container-low rounded-lg animate-pulse" />
             <div className="h-48 bg-surface-container-lowest rounded-xl animate-pulse" />
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="h-64 bg-surface-container-lowest rounded-xl animate-pulse" />
               <div className="h-64 bg-surface-container-lowest rounded-xl animate-pulse" />
             </div>
@@ -104,7 +104,7 @@ export default function AdminUserDetailsPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 px-6 max-w-5xl mx-auto text-center py-20">
+        <div className="pt-24 px-4 sm:px-6 max-w-5xl mx-auto text-center py-20">
           <UserIcon className="w-16 h-16 text-on-surface-variant/30 mx-auto mb-4" />
           <p className="text-on-surface-variant text-lg">لم يتم العثور على المستخدم</p>
           <Link href="/admin" className="text-primary font-bold mt-4 inline-block hover:underline">
@@ -123,7 +123,7 @@ export default function AdminUserDetailsPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="pt-24 pb-24 px-6 max-w-5xl mx-auto">
+      <main className="pt-24 pb-24 px-4 sm:px-6 max-w-5xl mx-auto">
 
         {/* Back button */}
         <Link
@@ -135,21 +135,21 @@ export default function AdminUserDetailsPage() {
         </Link>
 
         {/* User Header Card */}
-        <div className="bg-surface-container-lowest rounded-xl p-8 shadow-[24px_0_24px_-12px_rgba(18,28,42,0.04)] mb-6">
-          <div className="flex items-start gap-6">
+        <div className="bg-surface-container-lowest rounded-xl p-4 sm:p-8 shadow-[24px_0_24px_-12px_rgba(18,28,42,0.04)] mb-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-right">
             {/* Avatar */}
             {u.profileImage ? (
-              <img src={u.profileImage} alt={u.firstName} className="w-24 h-24 rounded-full object-cover border-4 border-primary-container/20" />
+              <img src={u.profileImage} alt={u.firstName} className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-primary-container/20" />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center font-bold text-3xl border-4 border-primary-container/20">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary text-white flex items-center justify-center font-bold text-2xl sm:text-3xl border-4 border-primary-container/20">
                 {u.firstName?.charAt(0) || '?'}
               </div>
             )}
 
             {/* Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-on-surface">{u.firstName} {u.lastName}</h1>
+            <div className="flex-1 min-w-0 w-full">
+              <div className="flex items-center flex-wrap justify-center sm:justify-start gap-2 sm:gap-3 mb-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-on-surface break-words">{u.firstName} {u.lastName}</h1>
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${roleBg}`}>
                   {roleLabels[u.role] || u.role}
                 </span>
@@ -186,7 +186,7 @@ export default function AdminUserDetailsPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 mt-6 pt-6 border-t border-outline-variant/15">
+          <div className="flex flex-wrap gap-2 sm:gap-3 mt-6 pt-6 border-t border-outline-variant/15">
             {u.status === 'active' && (
               <>
                 <button
@@ -316,7 +316,7 @@ export default function AdminUserDetailsPage() {
               <Briefcase className="w-5 h-5 text-primary" />
               ملف مزود الخدمة
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
               <div className="bg-surface-container-low rounded-lg p-3 text-center">
                 <p className="text-xs text-on-surface-variant">الفئة</p>
                 <p className="font-bold text-sm text-on-surface">{userData.workerProfile.Category?.name || '—'}</p>

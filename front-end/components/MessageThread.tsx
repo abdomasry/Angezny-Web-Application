@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Send, Image as ImageIcon, Paperclip, Check, CheckCheck, FileText, Download, Briefcase, X as XIcon } from 'lucide-react'
+import { Send, Image as ImageIcon, Paperclip, Check, CheckCheck, FileText, Download, Briefcase, X as XIcon, Bot, Sparkles, AlertTriangle } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useChat } from '@/lib/chat-context'
 import { useAuth } from '@/lib/auth-context'
@@ -124,7 +124,22 @@ interface Props {
 
 export default function MessageThread({ conversationId, otherUser, compact = false }: Props) {
   const { user } = useAuth()
-  const { sendMessage, markRead, setTyping, onMessage, onRead, onTyping, onlineUserIds } = useChat()
+  const {
+    sendMessage, markRead, setTyping,
+    onMessage, onRead, onTyping, onlineUserIds,
+    // AI streaming: we re-read the buffer on every aiStreamTick bump so
+    // the in-flight reply renders token-by-token without us putting the
+    // streaming map in state (which would re-render every consumer).
+    getAiStreamingText, aiStreamTick, onAiError,
+  } = useChat()
+
+  // The AI conversation is identified by the system user's role. We keep
+  // the rest of the component generic — only the bits that need to know
+  // (composer affordances, streaming bubble, error banner) branch on this.
+  const isAiConversation = otherUser?.role === 'ai'
+  // Inline error banner content, shown briefly when ai:error fires (rate
+  // limit, upstream Groq failure, etc.). Auto-clears after 6s.
+  const [aiError, setAiError] = useState<string | null>(null)
 
   // Pathname + params are used to detect the "ask-about-service" prefill
   // handoff from /services or /worker/[id]. When the URL looks like
@@ -311,12 +326,31 @@ export default function MessageThread({ conversationId, otherUser, compact = fal
     }
   }, [conversationId, user?.id, onMessage, onRead, onTyping, markRead])
 
+  // ─── AI error subscription ───────────────────────────────────
+  // Filters server-emitted ai:error events down to THIS conversation and
+  // surfaces the message text in an inline banner. Auto-dismisses after
+  // 6 seconds so it doesn't permanently cover the composer.
+  useEffect(() => {
+    if (!isAiConversation) return
+    const unsub = onAiError((e) => {
+      if (e.conversationId !== conversationId) return
+      setAiError(e.message)
+      // Clear previous timer if a new error lands while one is showing.
+      const id = setTimeout(() => setAiError(null), 6000)
+      return () => clearTimeout(id)
+    })
+    return () => { unsub() }
+  }, [isAiConversation, conversationId, onAiError])
+
   // ─── Auto-scroll to bottom when messages change ───────────
+  // aiStreamTick is included so the view follows tokens as they stream
+  // in. Without it, a long AI reply would render off-screen until the
+  // user scrolls manually.
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [messages, theyAreTyping])
+  }, [messages, theyAreTyping, aiStreamTick])
 
   // ─── Typing handler (debounced stop) ──────────────────────
   const handleInputChange = (val: string) => {
@@ -376,12 +410,43 @@ export default function MessageThread({ conversationId, otherUser, compact = fal
   const isWorkerViewingCustomer =
     user?.role === 'worker' && otherUser?.role === 'customer' && !!otherUser?._id
 
+  // Read the streaming text on every aiStreamTick. Empty string while
+  // idle; non-empty while Groq is streaming. We deliberately re-call this
+  // each render — getAiStreamingText is a cheap Map lookup.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _streamTick = aiStreamTick
+  const aiStreamingText = isAiConversation
+    ? getAiStreamingText(conversationId)
+    : ''
+  const aiIsStreaming = isAiConversation && aiStreamingText.length > 0
+
+  // Block double-send while the AI is mid-reply. Without this, a user
+  // who fires three messages in a row would get three half-finished
+  // streams interleaved (Groq doesn't queue per-user on our side).
+  const composerDisabled = uploading || (isAiConversation && aiIsStreaming)
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header (hidden in compact/widget mode — the widget provides its own) */}
       {!compact && otherUser && (
         <header className="bg-surface-container-lowest border-b border-outline-variant/10 p-4 flex items-center gap-3">
-          {(() => {
+          {isAiConversation ? (
+            // AI assistant header — distinct visual identity so the user
+            // can tell at a glance they're chatting with the bot, not a
+            // worker. No presence dot (the AI is "always online").
+            <>
+              <div className="w-11 h-11 rounded-full bg-linear-to-br from-primary to-blue-500 text-white flex items-center justify-center shadow-sm">
+                <Bot className="w-6 h-6" />
+              </div>
+              <div className="text-right flex-1">
+                <h2 className="font-bold text-on-surface flex items-center gap-1.5 justify-end">
+                  المساعد الذكي
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                </h2>
+                <p className="text-xs text-on-surface-variant">يجيب على أسئلتك حول المنصة</p>
+              </div>
+            </>
+          ) : (() => {
             const headerInner = (
               <>
                 <div className="relative">
@@ -535,7 +600,7 @@ export default function MessageThread({ conversationId, otherUser, compact = fal
           })
         )}
 
-        {/* Typing indicator row */}
+        {/* Typing indicator row (human side only) */}
         {theyAreTyping && (
           <div className="flex justify-start">
             <div className="bg-surface-container-low rounded-2xl px-4 py-2.5 flex gap-1">
@@ -545,59 +610,104 @@ export default function MessageThread({ conversationId, otherUser, compact = fal
             </div>
           </div>
         )}
+
+        {/* AI streaming bubble — only visible while Groq is mid-reply.
+            When ai:stream:end fires, the streaming buffer clears AND the
+            canonical chat:message has already been inserted via onMessage,
+            so the transition is seamless. If the buffer is empty but a
+            stream is in flight (ai:stream:start fired, no tokens yet) we
+            still show a 3-dot "thinking" indicator. */}
+        {isAiConversation && aiIsStreaming && (
+          <div className="flex justify-start">
+            <div className="max-w-[75%] bg-surface-container-low text-on-surface rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm">
+              {aiStreamingText ? (
+                <p className="text-sm whitespace-pre-wrap break-words">{aiStreamingText}</p>
+              ) : (
+                <div className="flex gap-1 py-0.5">
+                  <span className="w-2 h-2 rounded-full bg-on-surface-variant/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-on-surface-variant/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-on-surface-variant/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* AI error banner — rate limit / upstream Groq failure / etc.
+            Renders inside the message list (not as a toast) so it lives
+            in the same scroll context as the conversation. Auto-clears
+            after 6s via the useEffect above. */}
+        {isAiConversation && aiError && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl px-4 py-2.5 flex items-start gap-2 shadow-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">{aiError}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Composer */}
       <div className="bg-surface-container-lowest border-t border-outline-variant/10 p-3 flex items-center gap-2">
-        {/* Hidden file inputs — one scoped to images, one for any file type.
-            Each picker button triggers its matching input. Keeping them
-            separate lets the OS dialog show a relevant file filter. */}
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <button
-          type="button"
-          onClick={() => imageInputRef.current?.click()}
-          disabled={uploading}
-          className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors disabled:opacity-50"
-          title="إرفاق صورة"
-        >
-          <ImageIcon className="w-5 h-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors disabled:opacity-50"
-          title="إرفاق ملف (PDF وغيره)"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
+        {/* Attachment buttons + hidden file inputs.
+            AI conversations are text-only in v1 (Groq path is not multimodal),
+            so we hide both picker buttons there. The inputs themselves can
+            stay mounted — they'd just be unreachable. */}
+        {!isAiConversation && (
+          <>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploading}
+              className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors disabled:opacity-50"
+              title="إرفاق صورة"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-full transition-colors disabled:opacity-50"
+              title="إرفاق ملف (PDF وغيره)"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+          </>
+        )}
         <input
           ref={composerRef}
           type="text"
           value={input}
           onChange={e => handleInputChange(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-          placeholder={uploading ? 'جاري الرفع...' : 'اكتب رسالتك...'}
-          disabled={uploading}
-          className="flex-1 bg-surface-container-low border-none rounded-full px-4 py-2.5 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none"
+          placeholder={
+            uploading ? 'جاري الرفع...'
+            : aiIsStreaming ? 'المساعد يكتب...'
+            : isAiConversation ? 'اسأل المساعد الذكي...'
+            : 'اكتب رسالتك...'
+          }
+          disabled={composerDisabled}
+          className="flex-1 bg-surface-container-low border-none rounded-full px-4 py-2.5 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleSend}
-          disabled={!input.trim() || uploading}
+          disabled={!input.trim() || composerDisabled}
           className="p-2.5 bg-primary text-white rounded-full hover:bg-primary-container transition-colors disabled:opacity-40"
           title="إرسال"
         >

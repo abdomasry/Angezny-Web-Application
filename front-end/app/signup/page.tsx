@@ -304,7 +304,7 @@ export default function SignUpPage() {
             <div className="relative flex justify-center text-sm"><span className="px-4 bg-surface-container-lowest text-on-surface-variant">{t('auth.signup.or')}</span></div>
           </div>
 
-          <SocialAuthButtons redirectTo="/" onError={setSubmitError} />
+          <SocialAuthButtons redirectTo="/" onError={setSubmitError}  />
 
           <div className="mt-8 text-center">
             <p className="text-on-surface-variant">{t('auth.signup.haveAccount')}

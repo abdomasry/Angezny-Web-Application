@@ -11,6 +11,8 @@ import Navbar from '@/components/Navbar'
 import TicketThread from '@/components/TicketThread'
 import LicensesReviewQueue from '@/components/LicensesReviewQueue'
 import ProviderApplicationsQueue from '@/components/ProviderApplicationsQueue'
+import Pagination from '@/components/Pagination'
+import ImageUpload from '@/components/admin/ImageUpload'
 import type {
   AdminStats,
   AdminUser,
@@ -225,7 +227,9 @@ export default function AdminDashboardPage() {
         setStats(statsData.stats)
         setUsers(usersData.users)
         setUsersPagination(usersData.pagination)
-        setVerificationRequests(verData.requests)
+        // Drop verification requests whose user has been deleted — they're
+        // orphans that can't be acted on and would crash the renderer.
+        setVerificationRequests((verData.requests || []).filter((r: any) => r.userId))
         setVerificationPagination(verData.pagination)
         setReports(reportsData.reports)
         setReportsPagination(reportsData.pagination)
@@ -267,7 +271,7 @@ export default function AdminDashboardPage() {
     if (!isLoggedIn || user?.role !== 'admin') return
     api.getWithAuth(`/admin/verification-requests?page=${verificationPage}&limit=5`)
       .then(data => {
-        setVerificationRequests(data.requests)
+        setVerificationRequests((data.requests || []).filter((r: any) => r.userId))
         setVerificationPagination(data.pagination)
       })
       .catch(console.error)
@@ -745,8 +749,8 @@ export default function AdminDashboardPage() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex">
-        {/* Skeleton Sidebar */}
-        <aside className="h-screen w-64 fixed right-0 bg-white border-l border-outline-variant/15 p-6">
+        {/* Skeleton Sidebar — hidden on mobile, where admins use the section tabs at the top instead */}
+        <aside className="hidden md:block h-screen w-64 fixed right-0 bg-white border-l border-outline-variant/15 p-6">
           <div className="h-10 bg-gray-200 rounded-lg animate-pulse mb-8" />
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -759,9 +763,9 @@ export default function AdminDashboardPage() {
         </aside>
 
         {/* Skeleton Main */}
-        <main className="mr-64 p-8 flex-1">
+        <main className="md:mr-64 p-4 md:p-8 flex-1">
           <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-8" />
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
@@ -769,9 +773,9 @@ export default function AdminDashboardPage() {
               />
             ))}
           </div>
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-8 h-64 bg-gray-100 rounded-xl animate-pulse" />
-            <div className="col-span-4 h-64 bg-gray-100 rounded-xl animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8 h-64 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="lg:col-span-4 h-64 bg-gray-100 rounded-xl animate-pulse" />
           </div>
         </main>
       </div>
@@ -795,7 +799,7 @@ export default function AdminDashboardPage() {
 
           The border-l (left border) acts as a visual separator between
           sidebar and main content (since content is to the left in RTL). */}
-      <aside className="h-[calc(100vh-4rem)] w-64 border-l border-outline-variant/15 right-0 fixed top-16 bg-white shadow-[24px_0_24px_-12px_rgba(18,28,42,0.06)] z-40 flex flex-col">
+      <aside className="hidden md:flex h-[calc(100vh-4rem)] w-64 border-l border-outline-variant/15 right-0 fixed top-16 bg-white shadow-[24px_0_24px_-12px_rgba(18,28,42,0.06)] z-40 flex-col">
         {/* --- Logo / Brand --- */}
         <div className="p-6 pb-4">
           <div className="flex items-center gap-3">
@@ -852,7 +856,32 @@ export default function AdminDashboardPage() {
         </div>
       </aside>
 
-      <main className="mr-64 p-8 pt-24 min-h-screen">
+      <main className="md:mr-64 p-4 md:p-8 pt-20 md:pt-24 pb-24 md:pb-8 min-h-screen">
+
+        {/* Mobile section tabs — replaces the desktop sidebar on small screens.
+            Horizontal-scroll strip so all section keys remain reachable. */}
+        <div className="md:hidden -mx-4 px-4 mb-4 overflow-x-auto">
+          <div className="flex gap-2 min-w-max">
+            {sidebarLinks.map(link => {
+              const Icon = link.icon
+              const isActive = activeSection === link.key
+              return (
+                <button
+                  key={link.key}
+                  onClick={() => handleSectionChange(link.key)}
+                  className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'bg-primary text-on-primary'
+                      : 'bg-surface-container-low text-on-surface-variant'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{link.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         {activeSection !== 'dashboard' && activeSection !== 'orders' && activeSection !== 'pending-services' && activeSection !== 'pending-licenses' && activeSection !== 'provider-applications' && activeSection !== 'support' && activeSection !== 'coupons' ? (
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -931,7 +960,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {/* Category + payment type + price — inline row */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                         <div>
                           <p className="text-xs text-on-surface-variant mb-1">الفئة</p>
                           <p className="text-on-surface font-medium">{service.categoryId?.name || '—'}</p>
@@ -956,7 +985,7 @@ export default function AdminDashboardPage() {
                       {Array.isArray(service.images) && service.images.length > 0 && (
                         <div>
                           <p className="text-xs text-on-surface-variant mb-2">الصور ({service.images.length})</p>
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {service.images.map((url: string, idx: number) => (
                               <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block">
                                 <img
@@ -1004,13 +1033,12 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-            {pendingServicesPagination.pages > 1 && (
-              <div className="flex justify-center items-center gap-4 mt-6">
-                <button onClick={() => setPendingServicesPage(p => Math.max(1, p - 1))} disabled={pendingServicesPage === 1} className="px-4 py-2 rounded-xl text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-30">السابق</button>
-                <span className="text-sm text-on-surface-variant">صفحة {pendingServicesPage} من {pendingServicesPagination.pages}</span>
-                <button onClick={() => setPendingServicesPage(p => Math.min(pendingServicesPagination.pages, p + 1))} disabled={pendingServicesPage === pendingServicesPagination.pages} className="px-4 py-2 rounded-xl text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-30">التالي</button>
-              </div>
-            )}
+            <Pagination
+              page={pendingServicesPage}
+              totalPages={pendingServicesPagination.pages}
+              onPageChange={setPendingServicesPage}
+              className="mt-6"
+            />
           </div>
         ) : activeSection === 'support' ? (
           /* ============= SUPPORT TICKETS SECTION ============= */
@@ -1022,7 +1050,7 @@ export default function AdminDashboardPage() {
                   <span className="mx-2">/</span>
                   <span className="text-on-surface">بلاغات الدعم</span>
                 </nav>
-                <h1 className="text-3xl font-black text-on-surface tracking-tight">بلاغات الدعم</h1>
+                <h1 className="text-2xl sm:text-3xl font-black text-on-surface tracking-tight">بلاغات الدعم</h1>
                 <p className="text-on-surface-variant text-sm mt-1">
                   <span className="font-bold text-on-surface">{supportPagination.total}</span> بلاغ
                 </p>
@@ -1086,7 +1114,7 @@ export default function AdminDashboardPage() {
               {/* List pane */}
               <div className="lg:col-span-5 space-y-2">
                 {supportTickets.length === 0 ? (
-                  <div className="bg-surface-container-lowest rounded-xl p-10 text-center text-on-surface-variant">
+                  <div className="bg-surface-container-lowest rounded-xl p-6 sm:p-10 text-center text-on-surface-variant">
                     <LifeBuoy className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     <p>لا توجد بلاغات.</p>
                   </div>
@@ -1161,34 +1189,18 @@ export default function AdminDashboardPage() {
                   })
                 )}
 
-                {/* Pagination */}
-                {supportPagination.pages > 1 && (
-                  <div className="flex items-center justify-center gap-2 pt-4">
-                    <button
-                      onClick={() => setSupportPage(p => Math.max(1, p - 1))}
-                      disabled={supportPage === 1}
-                      className="px-3 py-1.5 rounded-lg text-xs bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-                    >
-                      السابق
-                    </button>
-                    <span className="text-xs text-on-surface-variant">
-                      {supportPage} / {supportPagination.pages}
-                    </span>
-                    <button
-                      onClick={() => setSupportPage(p => Math.min(supportPagination.pages, p + 1))}
-                      disabled={supportPage === supportPagination.pages}
-                      className="px-3 py-1.5 rounded-lg text-xs bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-                    >
-                      التالي
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  page={supportPage}
+                  totalPages={supportPagination.pages}
+                  onPageChange={setSupportPage}
+                  className="pt-4"
+                />
               </div>
 
               {/* Detail pane */}
               <div className="lg:col-span-7">
                 {!selectedTicketId ? (
-                  <div className="bg-surface-container-lowest rounded-2xl p-16 text-center text-on-surface-variant">
+                  <div className="bg-surface-container-lowest rounded-2xl p-8 sm:p-16 text-center text-on-surface-variant">
                     <LifeBuoy className="w-12 h-12 mx-auto mb-3 opacity-30" />
                     <p className="font-medium">اختر بلاغاً من القائمة لعرض التفاصيل والرد عليه.</p>
                   </div>
@@ -1424,16 +1436,12 @@ export default function AdminDashboardPage() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-on-surface-variant mb-1">رابط صورة البانر</label>
-                        <input
-                          type="url" value={couponForm.bannerImage}
-                          onChange={e => setCouponForm({ ...couponForm, bannerImage: e.target.value })}
-                          placeholder="https://..."
-                          className="w-full bg-surface-container-lowest border-none rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                        <ImageUpload
+                          label="صورة البانر"
+                          value={couponForm.bannerImage}
+                          onChange={(url) => setCouponForm({ ...couponForm, bannerImage: url })}
+                          previewClassName="w-full max-w-md h-40"
                         />
-                        {couponForm.bannerImage && (
-                          <img src={couponForm.bannerImage} alt="" className="mt-2 w-48 h-32 object-cover rounded-lg" onError={e => { (e.target as HTMLImageElement).style.opacity = '0.3' }} />
-                        )}
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-on-surface-variant mb-1">نص فرعي (اختياري)</label>
@@ -1466,7 +1474,8 @@ export default function AdminDashboardPage() {
                   <p className="text-on-surface-variant text-lg">لا توجد أكواد حالياً</p>
                 </div>
               ) : (
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
                   <thead className="bg-surface-container-low text-xs text-on-surface-variant">
                     <tr>
                       <th className="px-4 py-3 text-right font-semibold">الكود</th>
@@ -1566,6 +1575,7 @@ export default function AdminDashboardPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>
@@ -1643,7 +1653,11 @@ export default function AdminDashboardPage() {
                         // If the status isn't in our config (shouldn't happen), fall back to gray.
                         const badge = statusConfig[order.status] || { label: order.status, bg: 'bg-gray-100', text: 'text-gray-500' }
                         return (
-                          <tr key={order._id} className="border-b border-outline-variant/10 last:border-0">
+                          <tr
+                            key={order._id}
+                            onClick={() => router.push(`/admin/orders/${order._id}`)}
+                            className="border-b border-outline-variant/10 last:border-0 cursor-pointer hover:bg-surface-container-low/40 transition-colors"
+                          >
                             {/* Column 1: Category name + description preview */}
                             <td className="px-6 py-4">
                               <p className="font-bold text-sm text-on-surface">{order.categoryId?.name || 'خدمة عامة'}</p>
@@ -1702,7 +1716,10 @@ export default function AdminDashboardPage() {
                             <td className="px-6 py-4">
                               {order.status !== 'completed' && order.status !== 'cancelled' && (
                                 <button
-                                  onClick={() => handleOrderStatus(order._id, 'cancelled')}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOrderStatus(order._id, 'cancelled')
+                                  }}
                                   className="px-3 py-1 rounded-lg text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                                 >
                                   إلغاء
@@ -1722,34 +1739,19 @@ export default function AdminDashboardPage() {
             </div>
 
 
-            {adminOrdersPagination.pages > 1 && (
-              <div className="flex justify-center items-center gap-4 mt-6">
-                <button
-                  onClick={() => setAdminOrdersPage(p => Math.max(1, p - 1))}
-                  disabled={adminOrdersPage === 1}
-                  className="px-4 py-2 rounded-xl text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-30 hover:bg-surface-container-high transition-colors"
-                >
-                  السابق
-                </button>
-                <span className="text-sm text-on-surface-variant">
-                  صفحة {adminOrdersPage} من {adminOrdersPagination.pages}
-                </span>
-                <button
-                  onClick={() => setAdminOrdersPage(p => Math.min(adminOrdersPagination.pages, p + 1))}
-                  disabled={adminOrdersPage === adminOrdersPagination.pages}
-                  className="px-4 py-2 rounded-xl text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-30 hover:bg-surface-container-high transition-colors"
-                >
-                  التالي
-                </button>
-              </div>
-            )}
+            <Pagination
+              page={adminOrdersPage}
+              totalPages={adminOrdersPagination.pages}
+              onPageChange={setAdminOrdersPage}
+              className="mt-6"
+            />
           </div>
         ) : (
           <>
             {/* =============================================================
                 STAT CARDS ROW — 4 cards showing key platform metrics
                 =============================================================*/}
-            <div className="grid grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
               {/* Card 1: Total Users */}
               <div className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] flex items-center justify-between">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
@@ -1819,12 +1821,12 @@ export default function AdminDashboardPage() {
                 BENTO GRID — Main dashboard sections
                 =============================================================
  */}
-            <div className="grid grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* ===========================================================
                   USER MANAGEMENT TABLE (col-span-8)
                   ===========================================================
  */}
-              <div className="col-span-8 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
+              <div className="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
                 {/* Table Header with Filter Tabs */}
                 <div className="p-6 pb-4 flex items-center justify-between">
                   <h3 className="text-lg font-bold text-on-surface">
@@ -1858,8 +1860,8 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Table */}
-                <div className="px-6">
-                  <table className="w-full">
+                <div className="px-6 overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-outline-variant/15">
                         <th className="text-right py-3 text-sm font-medium text-on-surface-variant">
@@ -2016,59 +2018,19 @@ export default function AdminDashboardPage() {
                   </table>
                 </div>
 
-                {/* Pagination Controls */}
-                {usersPagination.pages > 1 && (
-                  <div className="p-4 flex items-center justify-center gap-2 border-t border-outline-variant/10">
-                    {/* Previous Button */}
-                    <button
-                      onClick={() =>
-                        setUsersPage((prev) => Math.max(1, prev - 1))
-                      }
-                      disabled={usersPage === 1}
-                      className="px-3 py-1.5 rounded-lg text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-40 hover:bg-surface-container transition-colors"
-                    >
-                      السابق
-                    </button>
-
-                    {/* Page Numbers */}
-                    {Array.from(
-                      { length: usersPagination.pages },
-                      (_, i) => i + 1
-                    ).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setUsersPage(pageNum)}
-                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                          usersPage === pageNum
-                            ? 'bg-primary text-on-primary'
-                            : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
-
-                    {/* Next Button */}
-                    <button
-                      onClick={() =>
-                        setUsersPage((prev) =>
-                          Math.min(usersPagination.pages, prev + 1)
-                        )
-                      }
-                      disabled={usersPage === usersPagination.pages}
-                      className="px-3 py-1.5 rounded-lg text-sm bg-surface-container-low text-on-surface-variant disabled:opacity-40 hover:bg-surface-container transition-colors"
-                    >
-                      التالي
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  page={usersPage}
+                  totalPages={usersPagination.pages}
+                  onPageChange={setUsersPage}
+                  className="p-4 border-t border-outline-variant/10"
+                />
               </div>
 
               {/* ===========================================================
                   VERIFICATION PANEL (col-span-4)
                   ===========================================================
   */}
-              <div className="col-span-4 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
+              <div className="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
                 {/* Header with pending count */}
                 <div className="p-6 pb-4 flex items-center justify-between">
                   <h3 className="text-lg font-bold text-on-surface">
@@ -2094,7 +2056,7 @@ export default function AdminDashboardPage() {
                       </p>
                     </div>
                   ) : (
-                    verificationRequests.map((req) => (
+                    verificationRequests.filter((req) => req.userId).map((req) => (
                       <div
                         key={req._id}
                         className="p-4 bg-surface-container-low rounded-xl"
@@ -2102,7 +2064,7 @@ export default function AdminDashboardPage() {
                         {/* Worker Info */}
                         <div className="flex items-center gap-3 mb-3">
                           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                            {req.userId.profileImage ? (
+                            {req.userId?.profileImage ? (
                               <img
                                 src={req.userId.profileImage}
                                 alt={req.userId.firstName}
@@ -2110,7 +2072,7 @@ export default function AdminDashboardPage() {
                               />
                             ) : (
                               <span className="text-primary font-bold text-sm">
-                                {req.userId.firstName[0]}
+                                {req.userId?.firstName?.[0] || '?'}
                               </span>
                             )}
                           </div>
@@ -2199,7 +2161,7 @@ export default function AdminDashboardPage() {
                   REPORTS / COMPLAINTS (col-span-6)
                   ===========================================================
  */}
-              <div className="col-span-6 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
+              <div className="lg:col-span-6 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] overflow-hidden">
                 <div className="p-6 pb-4">
                   <h3 className="text-lg font-bold text-on-surface mb-4">
                     البلاغات والشكاوى
@@ -2347,7 +2309,7 @@ export default function AdminDashboardPage() {
                   Displays all service categories in a 2-column grid.
                   Each card shows the category name and active status.
                   This section uses the categories already fetched from /api/categories. */}
-              <div className="col-span-6 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] p-6">
+              <div className="lg:col-span-6 bg-surface-container-lowest rounded-xl shadow-[0_2px_12px_-4px_rgba(18,28,42,0.08)] p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-on-surface">إدارة التصنيفات</h3>
                   <button
@@ -2375,13 +2337,11 @@ export default function AdminDashboardPage() {
                       onChange={e => setCategoryForm({...categoryForm, description: e.target.value})}
                       className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none"
                     />
-                    <input
-                      type="text"
-                      placeholder="رابط الصورة (اختياري)"
+                    <ImageUpload
+                      label="صورة التصنيف (اختياري)"
                       value={categoryForm.image}
-                      onChange={e => setCategoryForm({...categoryForm, image: e.target.value})}
-                      dir="ltr"
-                      className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none"
+                      onChange={(url) => setCategoryForm({ ...categoryForm, image: url })}
+                      previewClassName="w-32 h-32"
                     />
                     <div className="flex items-center justify-between">
                       <button

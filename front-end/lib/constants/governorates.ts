@@ -37,3 +37,33 @@ export const EGYPTIAN_GOVERNORATES = [
 ] as const;
 
 export type Governorate = (typeof EGYPTIAN_GOVERNORATES)[number];
+
+// Map a free-form string (typically Nominatim's `address.state` field, but
+// also handles user-typed input) to the canonical Arabic value we store in
+// the DB. Nominatim returns things like "محافظة القاهرة" or "Cairo
+// Governorate"; we want "القاهرة" so analytics joins line up with the value
+// workers pick from the dropdown.
+//
+// Returns null when nothing matches — caller decides whether to fall back
+// to `null` (leaves the field unset) or to a literal "غير محدد".
+export function normalizeGovernorate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  // Trim, collapse internal whitespace, strip the Arabic "محافظة " prefix
+  // and the English " Governorate" suffix that Nominatim adds.
+  const cleaned = String(raw)
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/^محافظة\s+/i, "")
+    .replace(/\s+Governorate$/i, "")
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return null;
+
+  const hit = EGYPTIAN_GOVERNORATES.find(
+    (g) =>
+      g.ar.toLowerCase() === cleaned ||
+      g.en.toLowerCase() === cleaned ||
+      g.slug.toLowerCase() === cleaned,
+  );
+  return hit ? hit.ar : null;
+}

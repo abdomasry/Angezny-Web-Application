@@ -13,6 +13,7 @@ import Link from 'next/link'
 import { Save, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useTranslations } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/lib/auth-context'
 import { api } from '@/lib/api'
@@ -29,6 +30,7 @@ type UpdatableUserFields = {
 export default function EditProfilePage() {
   const { isLoggedIn, isLoading: authLoading, updateUser } = useAuth()
   const router = useRouter()
+  const t = useTranslations('profileEdit')
 
   const [pageLoading, setPageLoading] = useState(true)
   const [submitError, setSubmitError] = useState('')
@@ -107,7 +109,7 @@ export default function EditProfilePage() {
 
       router.push('/profile')
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ التغييرات')
+      setSubmitError(err instanceof Error ? err.message : t('saveFailed'))
     }
   }
 
@@ -126,13 +128,13 @@ export default function EditProfilePage() {
       <main className="pt-24 pb-24 px-6 max-w-2xl mx-auto">
         <div className="bg-surface-container-lowest p-8 rounded-xl shadow-[24px_0_24px_-12px_rgba(18,28,42,0.04)]">
 
-          <h1 className="text-2xl font-bold text-on-surface mb-8">تعديل الملف الشخصي</h1>
+          <h1 className="text-2xl font-bold text-on-surface mb-8">{t('title')}</h1>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
             {/* Name row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="firstName" className="block text-sm font-semibold text-on-surface-variant">الاسم الأول</label>
+                <label htmlFor="firstName" className="block text-sm font-semibold text-on-surface-variant">{t('firstName')}</label>
                 <input
                   id="firstName"
                   type="text"
@@ -148,7 +150,7 @@ export default function EditProfilePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label htmlFor="lastName" className="block text-sm font-semibold text-on-surface-variant">الاسم الأخير</label>
+                <label htmlFor="lastName" className="block text-sm font-semibold text-on-surface-variant">{t('lastName')}</label>
                 <input
                   id="lastName"
                   type="text"
@@ -167,7 +169,7 @@ export default function EditProfilePage() {
 
             {/* Email (locked once verified) */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-semibold text-on-surface-variant">البريد الإلكتروني</label>
+              <label htmlFor="email" className="block text-sm font-semibold text-on-surface-variant">{t('email')}</label>
               <input
                 id="email"
                 type="email"
@@ -184,7 +186,7 @@ export default function EditProfilePage() {
                 {...register('email')}
               />
               <p className="text-xs text-on-surface-variant">
-                {emailEditable ? 'أضف بريد إلكتروني لتأمين حسابك' : 'لا يمكن تغيير البريد الإلكتروني بعد التحقق'}
+                {emailEditable ? t('emailEditableHint') : t('emailLockedHint')}
               </p>
               {errors.email && (
                 <p role="alert" className="text-xs text-red-700">{errors.email.message}</p>
@@ -193,7 +195,7 @@ export default function EditProfilePage() {
 
             {/* Phone */}
             <div className="space-y-2">
-              <label htmlFor="phone" className="block text-sm font-semibold text-on-surface-variant">رقم الهاتف</label>
+              <label htmlFor="phone" className="block text-sm font-semibold text-on-surface-variant">{t('phone')}</label>
               <input
                 id="phone"
                 type="tel"
@@ -215,11 +217,11 @@ export default function EditProfilePage() {
             {/* Location row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="city" className="block text-sm font-semibold text-on-surface-variant">المدينة</label>
+                <label htmlFor="city" className="block text-sm font-semibold text-on-surface-variant">{t('city')}</label>
                 <input
                   id="city"
                   type="text"
-                  placeholder="مثال: القاهرة"
+                  placeholder={t('cityPlaceholder')}
                   className="w-full bg-surface-container-low border-none rounded-xl px-5 py-3 text-right outline-none focus:ring-2 focus:ring-primary/20"
                   {...register('city')}
                 />
@@ -228,11 +230,11 @@ export default function EditProfilePage() {
                 )}
               </div>
               <div className="space-y-2">
-                <label htmlFor="area" className="block text-sm font-semibold text-on-surface-variant">المنطقة</label>
+                <label htmlFor="area" className="block text-sm font-semibold text-on-surface-variant">{t('area')}</label>
                 <input
                   id="area"
                   type="text"
-                  placeholder="مثال: مدينة نصر"
+                  placeholder={t('areaPlaceholder')}
                   className="w-full bg-surface-container-low border-none rounded-xl px-5 py-3 text-right outline-none focus:ring-2 focus:ring-primary/20"
                   {...register('area')}
                 />
@@ -244,11 +246,11 @@ export default function EditProfilePage() {
 
             {/* Bio */}
             <div className="space-y-2">
-              <label htmlFor="bio" className="block text-sm font-semibold text-on-surface-variant">نبذة عنك</label>
+              <label htmlFor="bio" className="block text-sm font-semibold text-on-surface-variant">{t('bio')}</label>
               <textarea
                 id="bio"
                 rows={3}
-                placeholder="اكتب نبذة مختصرة عنك..."
+                placeholder={t('bioPlaceholder')}
                 className={`w-full bg-surface-container-low border-none rounded-xl px-5 py-3 text-right outline-none focus:ring-2 resize-none ${
                   errors.bio ? 'ring-2 ring-red-300 focus:ring-red-300' : 'focus:ring-primary/20'
                 }`}
@@ -273,14 +275,14 @@ export default function EditProfilePage() {
                 className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
               >
                 <Save className="w-4 h-4" />
-                {isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                {isSubmitting ? t('saving') : t('save')}
               </button>
               <Link
                 href="/profile"
                 className="flex-1 flex items-center justify-center gap-2 bg-surface-container-low text-on-surface-variant py-3 rounded-xl font-bold hover:bg-surface-container-high transition-colors"
               >
                 <X className="w-4 h-4" />
-                إلغاء
+                {t('cancel')}
               </Link>
             </div>
           </form>

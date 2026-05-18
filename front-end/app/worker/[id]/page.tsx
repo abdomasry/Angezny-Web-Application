@@ -26,6 +26,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname, useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Star, MapPin, Calendar, ChevronLeft, ChevronRight, Briefcase, MessageSquare, MessageCircleQuestion, ShoppingBag, X, BadgeCheck, Clock, User as UserIcon, Building2, Wallet, Check } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import RankBadge from '@/components/RankBadge'
 import GalleryLightbox from '@/components/GalleryLightbox'
@@ -37,16 +38,7 @@ import { useCustomerOrigin } from '@/hooks/useCustomerOrigin'
 import { coordsFromPoint, formatDistance, haversineKm } from '@/lib/distance'
 import type { WorkerProfile, WorkerService, Review, PaginationInfo, PortfolioItem } from '@/lib/types'
 
-const DAY_NAMES_AR: Record<string, string> = {
-  sat: 'السبت',
-  sun: 'الأحد',
-  mon: 'الإثنين',
-  tue: 'الثلاثاء',
-  wed: 'الأربعاء',
-  thu: 'الخميس',
-  fri: 'الجمعة',
-}
-const DAY_ORDER = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri']
+const DAY_ORDER = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'] as const
 
 // =============================================================================
 // EXTENDED TYPE FOR THIS PAGE
@@ -100,6 +92,8 @@ export default function WorkerProfilePage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const t = useTranslations('workerProfile')
+  const locale = useLocale()
   const { isLoggedIn } = useAuth()
   const { findOrCreateConversation } = useChat()
 
@@ -129,7 +123,10 @@ export default function WorkerProfilePage() {
       router.push('/signin')
       return
     }
-    const conv = await findOrCreateConversation(worker.userId._id)
+    // Pass serviceId so the backend stamps `serviceContextId` on the
+    // conversation — that's what powers the "يسأل عن الخدمة" banner the
+    // worker sees in MessageThread.
+    const conv = await findOrCreateConversation(worker.userId._id, service._id)
     if (conv) router.push(`/messages/${conv._id}?service=${service._id}`)
   }
 
@@ -234,7 +231,7 @@ export default function WorkerProfilePage() {
         setWorker(data.worker)
       } catch (err: any) {
         console.error('Failed to load worker:', err)
-        setError(err.message || 'لم يتم العثور على مزود الخدمة')
+        setError(err.message || t('loadFailed'))
       } finally {
         setLoading(false) // Stop showing skeleton regardless of success/failure
       }
@@ -286,7 +283,7 @@ export default function WorkerProfilePage() {
   // toLocaleDateString('ar-EG', ...) formats dates in Arabic Egyptian locale.
   // e.g., "2024-03-15" → "١٥ مارس ٢٠٢٤"
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ar-EG', {
+    return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -403,18 +400,18 @@ export default function WorkerProfilePage() {
     <div className="bg-surface-container-lowest p-8 rounded-2xl shadow-sm border border-outline-variant/10">
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
         <UserIcon className="w-6 h-6 text-primary" />
-        نبذة عني
+        {t('aboutMe')}
       </h2>
       {worker.userId?.bio ? (
         <p className="text-on-surface-variant leading-relaxed mb-6 text-lg whitespace-pre-line">
           {worker.userId.bio}
         </p>
       ) : (
-        <p className="text-on-surface-variant text-sm mb-6">لم يضف المزود نبذة بعد.</p>
+        <p className="text-on-surface-variant text-sm mb-6">{t('noBio')}</p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <div>
-          <h3 className="font-bold mb-3 text-lg">المهارات المتخصصة</h3>
+          <h3 className="font-bold mb-3 text-lg">{t('skills')}</h3>
           {worker.skills && worker.skills.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {worker.skills.map((skill, i) => (
@@ -427,21 +424,21 @@ export default function WorkerProfilePage() {
               ))}
             </div>
           ) : (
-            <p className="text-on-surface-variant text-sm">لم تتم إضافة مهارات.</p>
+            <p className="text-on-surface-variant text-sm">{t('noSkills')}</p>
           )}
         </div>
         <div>
-          <h3 className="font-bold mb-3 text-lg">ساعات العمل</h3>
+          <h3 className="font-bold mb-3 text-lg">{t('workHours')}</h3>
           {worker.workingHours && worker.workingHours.length > 0 ? (
             <ul className="space-y-2 text-sm">
               {DAY_ORDER.map(day => {
                 const entry = worker.workingHours!.find(w => w.day === day)
-                const dayLabel = DAY_NAMES_AR[day]
+                const dayLabel = t(`days.${day}` as any)
                 if (!entry || !entry.enabled) {
                   return (
                     <li key={day} className="flex justify-between text-on-surface-variant">
                       <span>{dayLabel}</span>
-                      <span>مغلق</span>
+                      <span>{t('closed')}</span>
                     </li>
                   )
                 }
@@ -454,7 +451,7 @@ export default function WorkerProfilePage() {
               })}
             </ul>
           ) : (
-            <p className="text-on-surface-variant text-sm">لم يحدد المزود ساعات العمل.</p>
+            <p className="text-on-surface-variant text-sm">{t('noHours')}</p>
           )}
         </div>
       </div>
@@ -468,7 +465,7 @@ export default function WorkerProfilePage() {
       <div className="bg-surface-container-lowest p-8 rounded-2xl shadow-sm border border-outline-variant/10">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <Wallet className="w-6 h-6 text-primary" />
-          باقات الأسعار
+          {t('packages')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {pkgs.map((pkg, idx) => {
@@ -486,12 +483,12 @@ export default function WorkerProfilePage() {
               >
                 {isFeatured && (
                   <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-primary text-white px-3 py-1 rounded-full text-xs font-bold">
-                    الأكثر طلباً
+                    {t('mostPopular')}
                   </div>
                 )}
-                <h3 className="text-lg font-bold mb-2">{pkg.title || 'باقة'}</h3>
+                <h3 className="text-lg font-bold mb-2">{pkg.title || t('fallbackPackage')}</h3>
                 <div className="text-3xl font-bold text-primary mb-4">
-                  {pkg.price ? <>{pkg.price}<span className="text-sm text-on-surface-variant font-normal"> ج.م</span></> : 'تواصل'}
+                  {pkg.price ? <>{pkg.price}<span className="text-sm text-on-surface-variant font-normal"> {t('currency')}</span></> : t('contactForPrice')}
                 </div>
                 {pkg.description && (
                   <p className="text-sm text-on-surface-variant mb-4">{pkg.description}</p>
@@ -515,7 +512,7 @@ export default function WorkerProfilePage() {
                       : 'bg-surface-container-low text-on-surface hover:bg-surface-container-high'
                   }`}
                 >
-                  اختيار الباقة
+                  {t('choosePackage')}
                 </button>
               </div>
             )
@@ -538,32 +535,33 @@ export default function WorkerProfilePage() {
 
     // Format price label per typeofService.
     const formatPrice = (s: WorkerService) => {
+      if (s.typeofService === 'custom') return 'سعر مخصص'
       if (s.typeofService === 'hourly' && typeof s.price === 'number') {
-        return <>{s.price}<span className="text-xs text-on-surface-variant"> ج.م / ساعة</span></>
+        return <>{s.price}<span className="text-xs text-on-surface-variant"> {t('currencyPerHour')}</span></>
       }
       if (s.typeofService === 'range') {
         if (s.priceRange?.custom) return s.priceRange.custom
         const { min, max } = s.priceRange || {}
         if (typeof min === 'number' && typeof max === 'number') {
-          return <>{min} – {max}<span className="text-xs text-on-surface-variant"> ج.م</span></>
+          return <>{min} – {max}<span className="text-xs text-on-surface-variant"> {t('currency')}</span></>
         }
       }
       if (typeof s.price === 'number') {
-        return <>{s.price}<span className="text-xs text-on-surface-variant"> ج.م</span></>
+        return <>{s.price}<span className="text-xs text-on-surface-variant"> {t('currency')}</span></>
       }
-      return 'تواصل'
+      return t('contactForPrice')
     }
 
     return (
       <div className="bg-surface-container-lowest p-8 rounded-2xl shadow-sm border border-outline-variant/10">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <ShoppingBag className="w-6 h-6 text-primary" />
-          الخدمات المتاحة
+          {t('services')}
         </h2>
         {items.length === 0 ? (
           <div className="text-center py-12">
             <ShoppingBag className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-            <p className="text-on-surface-variant">لا توجد خدمات معروضة حالياً</p>
+            <p className="text-on-surface-variant">{t('noServices')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -593,20 +591,32 @@ export default function WorkerProfilePage() {
                   )}
                   <div className="text-primary font-bold mb-3">{formatPrice(s)}</div>
                   <div className="flex gap-2 mt-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleOrderService(s)}
-                      className="flex-1 bg-primary text-on-primary text-sm py-2 rounded-lg font-medium hover:bg-primary-container transition-colors"
-                    >
-                      اطلب الآن
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAskService(s)}
-                      className="flex-1 bg-surface-container-low text-primary border border-primary/20 text-sm py-2 rounded-lg font-medium hover:bg-primary/5 transition-colors"
-                    >
-                      اسأل
-                    </button>
+                    {s.typeofService === 'custom' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleAskService(s)}
+                        className="flex-1 bg-primary text-on-primary text-sm py-2 rounded-lg font-medium hover:bg-primary-container transition-colors"
+                      >
+                        {t('ask')}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleOrderService(s)}
+                          className="flex-1 bg-primary text-on-primary text-sm py-2 rounded-lg font-medium hover:bg-primary-container transition-colors"
+                        >
+                          {t('bookNow')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAskService(s)}
+                          className="flex-1 bg-surface-container-low text-primary border border-primary/20 text-sm py-2 rounded-lg font-medium hover:bg-primary/5 transition-colors"
+                        >
+                          {t('ask')}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -620,7 +630,7 @@ export default function WorkerProfilePage() {
             className="mt-4 inline-flex items-center gap-2 text-sm text-primary hover:underline"
           >
             <X className="w-4 h-4" />
-            إظهار جميع الخدمات
+            {t('showAllServices')}
           </button>
         )}
       </div>
@@ -635,7 +645,7 @@ export default function WorkerProfilePage() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Briefcase className="w-6 h-6 text-primary" />
-            معرض الأعمال
+            {t('portfolio')}
           </h2>
           {preview && items.length > 2 && (
             <button
@@ -643,7 +653,7 @@ export default function WorkerProfilePage() {
               onClick={() => setExpandedSection('portfolio')}
               className="text-primary font-medium hover:underline flex items-center gap-1"
             >
-              عرض الكل
+              {t('viewAll')}
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
@@ -660,7 +670,7 @@ export default function WorkerProfilePage() {
                 <div className="aspect-video relative overflow-hidden">
                   <img
                     src={item.images![0]}
-                    alt={item.title || 'عمل'}
+                    alt={item.title || t('fallbackPortfolioAlt')}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-on-surface/70 via-on-surface/20 to-transparent" />
@@ -677,7 +687,7 @@ export default function WorkerProfilePage() {
         ) : (
           <div className="text-center py-12">
             <Briefcase className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-            <p className="text-on-surface-variant">لا توجد أعمال بعد</p>
+            <p className="text-on-surface-variant">{t('noPortfolio')}</p>
           </div>
         )}
       </div>
@@ -691,10 +701,10 @@ export default function WorkerProfilePage() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-primary" />
-            تقييمات العملاء
+            {t('reviews')}
           </h2>
           {preview && reviewsPagination.total > 2 && (
-            <span className="text-on-surface-variant text-sm">{reviewsPagination.total} تقييم</span>
+            <span className="text-on-surface-variant text-sm">{t('reviewsCount', { count: reviewsPagination.total })}</span>
           )}
         </div>
         {visible.length > 0 ? (
@@ -732,7 +742,7 @@ export default function WorkerProfilePage() {
         ) : (
           <div className="text-center py-12">
             <Star className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-            <p className="text-on-surface-variant">لا توجد تقييمات بعد</p>
+            <p className="text-on-surface-variant">{t('noReviews')}</p>
           </div>
         )}
 
@@ -743,7 +753,7 @@ export default function WorkerProfilePage() {
             onClick={() => setExpandedSection('reviews')}
             className="w-full mt-6 py-3 text-primary font-bold bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors border border-primary/20"
           >
-            عرض المزيد من التقييمات ({reviewsPagination.total})
+            {t('moreReviews', { count: reviewsPagination.total })}
           </button>
         )}
         {!preview && reviewsPagination.pages > 1 && (
@@ -813,23 +823,23 @@ export default function WorkerProfilePage() {
               className="w-full bg-primary text-on-primary py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-all"
             >
               <Calendar className="w-5 h-5" />
-              احجز موعد الآن
+              {t('bookAppointment')}
             </button>
             <button
               onClick={handleStartChat}
               className="w-full bg-surface-container-low text-primary border border-primary/20 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-all"
             >
               <MessageSquare className="w-5 h-5" />
-              أرسل رسالة
+              {t('sendMessage')}
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-surface-container-low p-3 rounded-xl text-center">
-              <span className="block text-xs text-on-surface-variant mb-1">نسبة الإنجاز</span>
+              <span className="block text-xs text-on-surface-variant mb-1">{t('completionRate')}</span>
               <span className="font-bold text-primary text-lg">{completionRate}%</span>
             </div>
             <div className="bg-surface-container-low p-3 rounded-xl text-center">
-              <span className="block text-xs text-on-surface-variant mb-1">طلبات مكتملة</span>
+              <span className="block text-xs text-on-surface-variant mb-1">{t('completedOrders')}</span>
               <span className="font-bold text-primary text-lg">{completedOrders}</span>
             </div>
           </div>
@@ -843,15 +853,15 @@ export default function WorkerProfilePage() {
           <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant/10">
             <h3 className="font-bold mb-4 flex items-center gap-2">
               <BadgeCheck className="w-5 h-5 text-primary" />
-              شهادات التحقق
+              {t('verifications')}
             </h3>
             <ul className="space-y-3">
               {verifiedIdentity && (
                 <li className="flex items-start gap-3">
                   <BadgeCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="currentColor" />
                   <div>
-                    <p className="font-bold text-sm">الهوية الموثقة</p>
-                    <p className="text-xs text-on-surface-variant">تم التحقق من الهوية الوطنية</p>
+                    <p className="font-bold text-sm">{t('identityVerifiedTitle')}</p>
+                    <p className="text-xs text-on-surface-variant">{t('identityVerifiedBody')}</p>
                   </div>
                 </li>
               )}
@@ -859,8 +869,8 @@ export default function WorkerProfilePage() {
                 <li className="flex items-start gap-3">
                   <BadgeCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" fill="currentColor" />
                   <div>
-                    <p className="font-bold text-sm">الرخصة المهنية</p>
-                    <p className="text-xs text-on-surface-variant">تصاريح العمل وإثبات الانتساب</p>
+                    <p className="font-bold text-sm">{t('licenseVerifiedTitle')}</p>
+                    <p className="text-xs text-on-surface-variant">{t('licenseVerifiedBody')}</p>
                   </div>
                 </li>
               )}
@@ -875,8 +885,8 @@ export default function WorkerProfilePage() {
                     <p className="font-bold text-sm">{license.name}</p>
                     <p className="text-xs text-on-surface-variant">
                       {license.issuedBy
-                        ? `صادرة عن: ${license.issuedBy}`
-                        : 'تمت مراجعتها واعتمادها من إدارة المنصة'}
+                        ? t('issuedBy', { name: license.issuedBy })
+                        : t('platformVerified')}
                     </p>
                   </div>
                 </li>
@@ -931,7 +941,7 @@ export default function WorkerProfilePage() {
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   <span className="font-bold text-white text-lg">{worker.ratingAverage?.toFixed(1) || '0.0'}</span>
-                  <span>({worker.totalReviews} تقييم)</span>
+                  <span>{t('reviewsTotal', { count: worker.totalReviews })}</span>
                 </div>
                 {(worker.location?.address || distanceLabel) && (
                   <div className="flex items-center gap-2">
@@ -947,7 +957,7 @@ export default function WorkerProfilePage() {
                 {memberYear && (
                   <div className="flex items-center gap-2">
                     <Briefcase className="w-5 h-5" />
-                    <span>+{Math.max(1, new Date().getFullYear() - memberYear)} سنوات خبرة</span>
+                    <span>{t('yearsExperience', { count: Math.max(1, new Date().getFullYear() - memberYear) })}</span>
                   </div>
                 )}
               </div>
@@ -964,7 +974,7 @@ export default function WorkerProfilePage() {
             className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-surface-container-lowest border border-outline-variant/20 rounded-xl font-bold text-primary hover:bg-surface-container-low transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
-            العودة للملف الكامل
+            {t('backToProfile')}
           </button>
         )}
 

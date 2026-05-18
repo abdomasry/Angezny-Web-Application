@@ -19,6 +19,10 @@ interface Props {
 
 export default function ServiceGridCard({ service, worker, onAsk, onOrder, formatPrice }: Props) {
   const image = service.images?.[0]
+  // Custom-priced services are "ask only" — they can't be ordered directly
+  // from the catalog. The price label is "سعر مخصص" and the order button
+  // is hidden, leaving just the ask CTA that opens chat with the worker.
+  const isCustom = service.typeofService === 'custom'
   return (
     <article className="bg-surface-container-lowest rounded-2xl overflow-hidden shadow-[0_24px_24px_-16px_rgba(18,28,42,0.06)] hover:shadow-[0_32px_40px_-16px_rgba(18,28,42,0.1)] transition-shadow flex flex-col">
       {/* Image */}
@@ -73,24 +77,39 @@ export default function ServiceGridCard({ service, worker, onAsk, onOrder, forma
 
         {/* Price + actions */}
         <div className="mt-auto flex items-center justify-between gap-2">
-          <span className="text-sm font-black text-on-surface">{formatPrice(service)}</span>
+          <span className="text-sm font-black text-on-surface">
+            {isCustom ? 'سعر مخصص' : formatPrice(service)}
+          </span>
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onAsk(service, worker)}
-              title="استفسر عن هذه الخدمة"
-              className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
-            >
-              <MessageCircleQuestion className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onOrder(service)}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>اطلب</span>
-            </button>
+            {isCustom ? (
+              <button
+                type="button"
+                onClick={() => onAsk(service, worker)}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
+              >
+                <MessageCircleQuestion className="w-3.5 h-3.5" />
+                <span>اسأل</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onAsk(service, worker)}
+                  title="استفسر عن هذه الخدمة"
+                  className="p-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <MessageCircleQuestion className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOrder(service)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>اطلب</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

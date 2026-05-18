@@ -12,6 +12,7 @@
 import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { Loader2, MapPin, X, ExternalLink } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 const LeafletMap = dynamic(() => import('./LeafletMap'), {
   ssr: false,
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function LocationViewer({ open, lat, lng, address, onClose }: Props) {
+  const t = useTranslations('locationViewer')
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -61,13 +63,13 @@ export default function LocationViewer({ open, lat, lng, address, onClose }: Pro
         <div className="flex items-center justify-between p-5 border-b border-outline-variant/20">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <MapPin className="w-5 h-5 text-primary" />
-            موقع الطلب على الخريطة
+            {t('title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-surface-container-high"
-            aria-label="إغلاق"
+            aria-label={t('close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -92,7 +94,7 @@ export default function LocationViewer({ open, lat, lng, address, onClose }: Pro
         {/* Footer — coords + open-in-maps */}
         <div className="p-5 border-t border-outline-variant/20 flex items-center justify-between gap-3">
           <p className="text-xs text-on-surface-variant">
-            الإحداثيات: {lat.toFixed(5)}, {lng.toFixed(5)}
+            {t('coords', { lat: lat.toFixed(5), lng: lng.toFixed(5) })}
           </p>
           <a
             href={externalHref}
@@ -100,7 +102,7 @@ export default function LocationViewer({ open, lat, lng, address, onClose }: Pro
             rel="noopener noreferrer"
             className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-container transition-colors flex items-center gap-2"
           >
-            فتح في خرائط جوجل
+            {t('openGoogleMaps')}
             <ExternalLink className="w-4 h-4" />
           </a>
         </div>

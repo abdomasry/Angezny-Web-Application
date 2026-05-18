@@ -150,6 +150,11 @@ export const checkoutSchema = z.object({
   // see this on the order card so they can navigate to the spot.
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  // Reverse-geocoded from the pin and persisted on the order so admin
+  // analytics can group by location. Both optional — sent when the picker
+  // resolved them, omitted when the customer typed an address manually.
+  governorate: z.string().trim().max(60).optional(),
+  city: z.string().trim().max(80).optional(),
 })
 
 // /profile/edit — customer profile editor.
@@ -203,7 +208,7 @@ export const serviceFormSchema = z
     name: z.string().trim().min(2, 'اسم الخدمة قصير جداً').max(100, 'الاسم طويل جداً'),
     description: z.string().trim().max(1000, 'الوصف طويل جداً').optional().or(z.literal('')),
     categoryId: objectIdField,
-    typeofService: z.enum(['fixed', 'hourly', 'range']),
+    typeofService: z.enum(['fixed', 'hourly', 'range', 'custom']),
     price: z.number().nonnegative().optional(),
     priceRange: z
       .object({
@@ -211,9 +216,14 @@ export const serviceFormSchema = z
         max: z.number().nonnegative(),
       })
       .optional(),
+    paymentTiming: z.enum(['before', 'after']).optional(),
     images: z.array(z.string().url()).max(6, 'الحد الأقصى 6 صور'),
   })
   .superRefine((data, ctx) => {
+    if (data.typeofService === 'custom') {
+      // Custom-priced services have no preset price — nothing to validate.
+      return
+    }
     if (data.typeofService === 'range') {
       if (!data.priceRange?.min || data.priceRange.min <= 0) {
         ctx.addIssue({ code: 'custom', message: 'حدّد أقل سعر للنطاق', path: ['priceRange', 'min'] })

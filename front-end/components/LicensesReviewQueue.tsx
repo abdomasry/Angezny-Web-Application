@@ -14,8 +14,9 @@
 // =============================================================================
 
 import { useEffect, useState } from 'react'
-import { ShieldCheck, FileText, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Clock, BadgeCheck } from 'lucide-react'
+import { ShieldCheck, FileText, Check, X as XIcon, AlertCircle, Clock, BadgeCheck } from 'lucide-react'
 import { api } from '@/lib/api'
+import Pagination from '@/components/Pagination'
 import type { WorkerLicense, PaginationInfo } from '@/lib/types'
 
 // Row shape returned by the aggregation in admin.controller.getLicenses.
@@ -276,31 +277,13 @@ export default function LicensesReviewQueue() {
         </ul>
       )}
 
-      {/* Pagination — only when there's more than one page */}
-      {pagination.pages > 1 && !loading && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="w-10 h-10 inline-flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-            aria-label="السابق"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-          <span className="text-sm text-on-surface-variant px-3">
-            صفحة {page} من {pagination.pages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
-            disabled={page === pagination.pages}
-            className="w-10 h-10 inline-flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-            aria-label="التالي"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-        </div>
+      {!loading && (
+        <Pagination
+          page={page}
+          totalPages={pagination.pages}
+          onPageChange={setPage}
+          className="pt-2"
+        />
       )}
     </section>
   )

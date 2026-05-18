@@ -43,6 +43,7 @@ const suggest = async (req, res) => {
         ...matchService,
         active: true,
         approvalStatus: "approved",
+        isPrivate: { $ne: true },
       })
         .populate("categoryId", "name")
         .select("name categoryId")

@@ -18,10 +18,11 @@ import {
   Clock, ChevronLeft, ChevronRight, Calendar, MapPin,
   Check, X as XIcon, Play, CheckCircle2, Wallet, CreditCard,
   Upload, Loader2, ImageIcon, FileCheck2, ArrowDownCircle,
-  TrendingUp, Banknote, Landmark, AlertTriangle, Camera,
+  TrendingUp, Landmark, AlertTriangle, Camera,
 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useTranslations } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import CompletionReportCard from '@/components/CompletionReportCard'
 import RateCustomerModal from '@/components/RateCustomerModal'
@@ -42,13 +43,13 @@ import type {
 // ─── Status Badge Config ─────────────────────────────────────────────
 // Maps each order status string to its Arabic label + Tailwind color classes.
 // We reuse the exact same config from the customer profile page for consistency.
-const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  pending:     { label: 'قيد الانتظار', bg: 'bg-amber-50',   text: 'text-amber-600' },
-  accepted:    { label: 'مقبول',        bg: 'bg-blue-50',    text: 'text-blue-600' },
-  in_progress: { label: 'قيد التنفيذ',  bg: 'bg-primary/10', text: 'text-primary' },
-  completed:   { label: 'مكتمل',        bg: 'bg-green-50',   text: 'text-green-600' },
-  rejected:    { label: 'مرفوض',        bg: 'bg-red-50',     text: 'text-red-600' },
-  cancelled:   { label: 'ملغي',         bg: 'bg-gray-100',   text: 'text-gray-500' },
+const statusColors: Record<string, { bg: string; text: string; key: string }> = {
+  pending:     { bg: 'bg-amber-50',   text: 'text-amber-600', key: 'statusPending' },
+  accepted:    { bg: 'bg-blue-50',    text: 'text-blue-600',  key: 'statusAccepted' },
+  in_progress: { bg: 'bg-primary/10', text: 'text-primary',   key: 'statusInProgress' },
+  completed:   { bg: 'bg-green-50',   text: 'text-green-600', key: 'statusCompleted' },
+  rejected:    { bg: 'bg-red-50',     text: 'text-red-600',   key: 'statusRejected' },
+  cancelled:   { bg: 'bg-gray-100',   text: 'text-gray-500',  key: 'statusCancelled' },
 }
 
 export default function WorkerDashboardPage() {
@@ -58,6 +59,7 @@ export default function WorkerDashboardPage() {
   //   isLoggedIn — boolean shorthand for !!user
   //   isLoading  — true while the initial auth check is happening
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
+  const t = useTranslations('dashboard')
   const router = useRouter()
 
   // ─── Page State ──────────────────────────────────────────────────
@@ -103,6 +105,7 @@ export default function WorkerDashboardPage() {
     price: 0,
     typeofService: 'fixed',
     priceRange: { min: 0, max: 0 },
+    paymentTiming: 'before',
     categoryId: '',
     images: [],
   }
@@ -202,7 +205,7 @@ export default function WorkerDashboardPage() {
 
   const savePortfolioDraft = async () => {
     if (!portfolioDraft || !workerProfile) return
-    if (!portfolioDraft.title.trim()) return alert('العنوان مطلوب')
+    if (!portfolioDraft.title.trim()) return alert(t('alerts.titleRequired'))
 
     const next = [...(workerProfile.portfolio || [])]
     const cleaned = {
@@ -223,7 +226,7 @@ export default function WorkerDashboardPage() {
       setWorkerProfile(data.profile)
       setPortfolioDraft(null)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('alerts.saveFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -231,14 +234,14 @@ export default function WorkerDashboardPage() {
 
   const deletePortfolioItem = async (idx: number) => {
     if (!workerProfile) return
-    if (!confirm('حذف هذا العمل؟')) return
+    if (!confirm(t('alerts.deletePortfolioConfirm'))) return
     const next = (workerProfile.portfolio || []).filter((_, i) => i !== idx)
     try {
       setProfileSaving(true)
       const data = await api.putWithAuth('/worker/profile', { portfolio: next })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحذف')
+      alert(err?.message || t('alerts.deleteFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -275,7 +278,7 @@ export default function WorkerDashboardPage() {
 
   const savePackageDraft = async () => {
     if (!packageDraft || !workerProfile) return
-    if (!packageDraft.title.trim()) return alert('عنوان الباقة مطلوب')
+    if (!packageDraft.title.trim()) return alert(t('alerts.packageTitleRequired'))
     const features = packageDraft.features
       .split(/[,،\n]/)
       .map(f => f.trim())
@@ -298,7 +301,7 @@ export default function WorkerDashboardPage() {
       setWorkerProfile(data.profile)
       setPackageDraft(null)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('alerts.saveFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -306,14 +309,14 @@ export default function WorkerDashboardPage() {
 
   const deletePackage = async (idx: number) => {
     if (!workerProfile) return
-    if (!confirm('حذف هذه الباقة؟')) return
+    if (!confirm(t('alerts.deletePackageConfirm'))) return
     const next = (workerProfile.packages || []).filter((_, i) => i !== idx)
     try {
       setProfileSaving(true)
       const data = await api.putWithAuth('/worker/profile', { packages: next })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحذف')
+      alert(err?.message || t('alerts.deleteFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -330,8 +333,8 @@ export default function WorkerDashboardPage() {
   }
   const DAY_ORDER_KEYS = ['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'] as const
   const DAY_LABELS: Record<string, string> = {
-    sat: 'السبت', sun: 'الأحد', mon: 'الإثنين', tue: 'الثلاثاء',
-    wed: 'الأربعاء', thu: 'الخميس', fri: 'الجمعة',
+    sat: t('days.sat'), sun: t('days.sun'), mon: t('days.mon'), tue: t('days.tue'),
+    wed: t('days.wed'), thu: t('days.thu'), fri: t('days.fri'),
   }
   const deriveHoursDraft = (entries: WorkerProfile['workingHours']): HoursDraft => {
     const list = entries || []
@@ -387,7 +390,7 @@ export default function WorkerDashboardPage() {
       const data = await api.putWithAuth('/worker/profile', { workingHours: expanded })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('alerts.saveFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -401,7 +404,7 @@ export default function WorkerDashboardPage() {
       const data = await api.putWithAuth('/worker/profile', { typeOfWorker })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('alerts.saveFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -473,7 +476,7 @@ export default function WorkerDashboardPage() {
         setProfileTextDraft(prev => ({ ...prev, location: picked.address! }))
       }
     } catch (err: any) {
-      alert(err?.message || 'فشل حفظ الموقع')
+      alert(err?.message || t('alerts.saveLocationFailed'))
     } finally {
       setSavingCoords(false)
     }
@@ -486,7 +489,7 @@ export default function WorkerDashboardPage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      alert('الرجاء اختيار ملف صورة')
+      alert(t('alerts.imageOnly'))
       e.target.value = ''
       return
     }
@@ -496,7 +499,7 @@ export default function WorkerDashboardPage() {
       const data = await api.putWithAuth('/worker/profile', { profileImage: url })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل رفع الصورة')
+      alert(err?.message || t('alerts.uploadFailed'))
     } finally {
       setAvatarUploading(false)
       e.target.value = ''
@@ -520,7 +523,7 @@ export default function WorkerDashboardPage() {
     const room = MAX_SERVICE_IMAGES - currentImages.length
     const toUpload = files.slice(0, room)
     if (toUpload.length === 0) {
-      setServiceError(`الحد الأقصى ${MAX_SERVICE_IMAGES} صور للخدمة`)
+      setServiceError(t('alerts.maxServiceImages', { n: MAX_SERVICE_IMAGES }))
       return
     }
 
@@ -541,9 +544,9 @@ export default function WorkerDashboardPage() {
       const next = [...currentImages, ...urls]
       serviceFormApi.setValue('images', next, { shouldValidate: true, shouldDirty: true })
       if (urls.length < toUpload.length) {
-        setServiceError('تعذّر رفع بعض الصور — حاول مرة أخرى')
+        setServiceError(t('alerts.someUploadsFailed'))
       } else if (toUpload.length < files.length) {
-        setServiceError(`تم رفع ${toUpload.length} فقط — الحد الأقصى ${MAX_SERVICE_IMAGES}`)
+        setServiceError(t('alerts.onlyUploaded', { n: toUpload.length, max: MAX_SERVICE_IMAGES }))
       }
     } finally {
       setUploadingServiceImages(false)
@@ -562,7 +565,7 @@ export default function WorkerDashboardPage() {
     const room = MAX_PORTFOLIO_IMAGES - portfolioDraft.images.length
     const toUpload = files.slice(0, room)
     if (toUpload.length === 0) {
-      alert(`الحد الأقصى ${MAX_PORTFOLIO_IMAGES} صور لكل عمل`)
+      alert(t('alerts.maxPortfolioImages', { n: MAX_PORTFOLIO_IMAGES }))
       return
     }
 
@@ -583,9 +586,9 @@ export default function WorkerDashboardPage() {
       // when the worker types in another field while uploads are running.
       setPortfolioDraft(prev => prev ? { ...prev, images: [...prev.images, ...urls] } : prev)
       if (urls.length < toUpload.length) {
-        alert('تعذّر رفع بعض الصور — حاول مرة أخرى')
+        alert(t('alerts.someUploadsFailed'))
       } else if (toUpload.length < files.length) {
-        alert(`تم رفع ${toUpload.length} فقط — الحد الأقصى ${MAX_PORTFOLIO_IMAGES}`)
+        alert(t('alerts.onlyUploaded', { n: toUpload.length, max: MAX_PORTFOLIO_IMAGES }))
       }
     } finally {
       setUploadingPortfolioImages(false)
@@ -608,7 +611,7 @@ export default function WorkerDashboardPage() {
       })
       setWorkerProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('alerts.saveFailed'))
     } finally {
       setProfileSaving(false)
     }
@@ -747,7 +750,7 @@ export default function WorkerDashboardPage() {
       setServices(prev => [...prev, data.service])
       resetServiceForm()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذّر إضافة الخدمة'
+      const msg = err instanceof Error ? err.message : t('alerts.addServiceFailed')
       setServiceError(msg)
     } finally {
       setServiceSaving(false)
@@ -768,7 +771,7 @@ export default function WorkerDashboardPage() {
       setServices(prev => prev.map(s => s._id === editingServiceId ? data.service : s))
       resetServiceForm()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذّر تحديث الخدمة'
+      const msg = err instanceof Error ? err.message : t('alerts.updateServiceFailed')
       setServiceError(msg)
     } finally {
       setServiceSaving(false)
@@ -809,7 +812,7 @@ export default function WorkerDashboardPage() {
       setServices(prev => prev.filter(s => s._id !== id))
       setDeletingServiceId(null)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذّر حذف الخدمة'
+      const msg = err instanceof Error ? err.message : t('alerts.deleteServiceFailed')
       // Surface as the same banner so the worker sees what failed.
       setServiceError(msg)
     } finally {
@@ -843,7 +846,7 @@ export default function WorkerDashboardPage() {
   ) => {
     let denialReason: string | undefined
     if (action === 'denied') {
-      const reason = window.prompt('سبب رفض طلب الإلغاء (اختياري):')
+      const reason = window.prompt(t('alerts.cancelRequestRejectReasonPrompt'))
       if (reason === null) return
       denialReason = reason.trim() || undefined
     }
@@ -864,7 +867,7 @@ export default function WorkerDashboardPage() {
       })
     } catch (err: any) {
       console.error('Failed to respond to cancellation:', err)
-      window.alert(err?.message || 'تعذّر معالجة طلب الإلغاء')
+      window.alert(err?.message || t('alerts.cancelRequestFailed'))
     }
   }
 
@@ -874,7 +877,7 @@ export default function WorkerDashboardPage() {
   ) => {
     let rejectionReason: string | undefined
     if (status === 'rejected') {
-      const reason = window.prompt('سبب الرفض (اختياري):')
+      const reason = window.prompt(t('alerts.rejectReasonPrompt'))
       // Null means user clicked Cancel on the prompt — abort the whole action.
       if (reason === null) return
       rejectionReason = reason.trim() || undefined
@@ -899,7 +902,7 @@ export default function WorkerDashboardPage() {
       })
     } catch (err: any) {
       console.error('Failed to update order status:', err)
-      window.alert(err?.message || 'تعذّر تحديث حالة الطلب')
+      window.alert(err?.message || t('alerts.updateStatusFailed'))
     }
   }
 
@@ -947,7 +950,7 @@ export default function WorkerDashboardPage() {
     const room = MAX_COMPLETION_IMAGES - completionImages.length
     const toUpload = files.slice(0, room)
     if (toUpload.length === 0) {
-      setCompletionError(`الحد الأقصى ${MAX_COMPLETION_IMAGES} صور`)
+      setCompletionError(t('alerts.maxCompletionImages', { n: MAX_COMPLETION_IMAGES }))
       return
     }
     setCompletionUploading(true)
@@ -962,7 +965,7 @@ export default function WorkerDashboardPage() {
       const urls = uploads.filter((u): u is string => !!u)
       setCompletionImages(prev => [...prev, ...urls])
       if (urls.length < toUpload.length) {
-        setCompletionError('تعذّر رفع بعض الصور — حاول مرة أخرى')
+        setCompletionError(t('alerts.someUploadsFailed'))
       }
     } finally {
       setCompletionUploading(false)
@@ -978,11 +981,11 @@ export default function WorkerDashboardPage() {
     setCompletionError('')
     const details = completionDetails.trim()
     if (!details) {
-      setCompletionError('يرجى كتابة تفاصيل العمل المنجز')
+      setCompletionError(t('alerts.completionDetailsRequired'))
       return
     }
     if (completionImages.length === 0) {
-      setCompletionError('يرجى إرفاق صورة واحدة على الأقل')
+      setCompletionError(t('alerts.completionImageRequired'))
       return
     }
     setCompletionSubmitting(true)
@@ -1002,7 +1005,7 @@ export default function WorkerDashboardPage() {
       setCompletionImages([])
     } catch (err: any) {
       console.error('Failed to submit completion:', err)
-      setCompletionError(err?.message || 'تعذّر إنهاء الطلب')
+      setCompletionError(err?.message || t('alerts.completionFailed'))
     } finally {
       setCompletionSubmitting(false)
     }
@@ -1025,6 +1028,7 @@ export default function WorkerDashboardPage() {
         min: service.priceRange?.min || 0,
         max: service.priceRange?.max || 0,
       },
+      paymentTiming: (service as any).paymentTiming || 'before',
       categoryId: catId || '',
       images: service.images || [],
     })
@@ -1120,7 +1124,7 @@ export default function WorkerDashboardPage() {
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
                     disabled={avatarUploading}
-                    aria-label="تغيير الصورة الشخصية"
+                    aria-label={t('avatarChange')}
                     className="absolute bottom-0 left-0 w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg hover:scale-110 transition-transform disabled:opacity-60 disabled:cursor-wait"
                   >
                     {avatarUploading ? (
@@ -1142,7 +1146,7 @@ export default function WorkerDashboardPage() {
                 </h2>
                 {/* Specialty: comes from the worker's Category. Falls back to a generic label. */}
                 <p className="text-sm text-on-surface-variant mt-1">
-                  {workerProfile?.Category?.name || 'مزود خدمات'}
+                  {workerProfile?.Category?.name || t('specialtyFallback')}
                 </p>
               </div>
 
@@ -1158,7 +1162,7 @@ export default function WorkerDashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 text-sm text-on-surface-variant">
                     <Clock className="w-4 h-4 text-amber-500" />
-                    <span>طلبات معلقة</span>
+                    <span>{t('stats.pendingOrders')}</span>
                   </div>
                   <span className="font-bold text-on-surface">{stats?.pendingOrders ?? 0}</span>
                 </div>
@@ -1166,7 +1170,7 @@ export default function WorkerDashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 text-sm text-on-surface-variant">
                     <ShoppingBag className="w-4 h-4 text-green-500" />
-                    <span>طلبات مكتملة</span>
+                    <span>{t('stats.completedOrders')}</span>
                   </div>
                   <span className="font-bold text-on-surface">{stats?.completedOrders ?? 0}</span>
                 </div>
@@ -1174,9 +1178,9 @@ export default function WorkerDashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 text-sm text-on-surface-variant">
                     <DollarSign className="w-4 h-4 text-primary" />
-                    <span>إجمالي الأرباح</span>
+                    <span>{t('stats.totalEarnings')}</span>
                   </div>
-                  <span className="font-bold text-primary">{stats?.totalEarnings ?? 0} ج.م</span>
+                  <span className="font-bold text-primary">{t('orders.priceEgp', { price: stats?.totalEarnings ?? 0 })}</span>
                 </div>
               </div>
 
@@ -1196,7 +1200,7 @@ export default function WorkerDashboardPage() {
                 className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity"
               >
                 <Plus className="w-4 h-4" />
-                إضافة خدمة جديدة
+                {t('addNewService')}
               </button>
             </div>
           </aside>
@@ -1212,7 +1216,7 @@ export default function WorkerDashboardPage() {
               <div className="bg-surface-container-lowest rounded-xl p-4 mb-6 flex items-center gap-4 shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
                 <RankBadge rank={workerProfile.rank} size="md" />
                 <div className="text-sm text-on-surface-variant">
-                  أنجزت <span className="font-bold text-on-surface">{workerProfile.completedOrdersCount || 0}</span> طلباً مكتملاً
+                  {t.rich('completedOrdersMessage', { count: workerProfile.completedOrdersCount || 0, b: (chunks) => <span className="font-bold text-on-surface">{chunks}</span> })}
                 </div>
               </div>
             )}
@@ -1229,7 +1233,7 @@ export default function WorkerDashboardPage() {
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
-                ملفي
+                {t('tabs.myFile')}
               </button>
               <button
                 onClick={() => handleTabChange('services')}
@@ -1239,7 +1243,7 @@ export default function WorkerDashboardPage() {
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
-                خدماتي
+                {t('tabs.services')}
               </button>
               <button
                 onClick={() => handleTabChange('active_orders')}
@@ -1249,7 +1253,7 @@ export default function WorkerDashboardPage() {
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
-                طلبات قيد التنفيذ
+                {t('tabs.inProgressOrders')}
               </button>
               <button
                 onClick={() => handleTabChange('history')}
@@ -1259,7 +1263,7 @@ export default function WorkerDashboardPage() {
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
                 }`}
               >
-                سجل الطلبات
+                {t('tabs.history')}
               </button>
               <button
                 onClick={() => handleTabChange('wallet')}
@@ -1270,7 +1274,7 @@ export default function WorkerDashboardPage() {
                 }`}
               >
                 <Wallet className="w-4 h-4" />
-                المحفظة
+                {t('tabs.wallet')}
               </button>
             </div>
 
@@ -1285,7 +1289,7 @@ export default function WorkerDashboardPage() {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                       <ImageIcon className="w-5 h-5 text-primary" />
-                      معرض الأعمال
+                      {t('portfolio.title')}
                     </h3>
                     {!portfolioDraft && (
                       <button
@@ -1294,7 +1298,7 @@ export default function WorkerDashboardPage() {
                         className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
-                        إضافة عمل
+                        {t('portfolio.add')}
                       </button>
                     )}
                   </div>
@@ -1303,7 +1307,7 @@ export default function WorkerDashboardPage() {
                   {!portfolioDraft && (
                     <>
                       {(workerProfile.portfolio || []).length === 0 ? (
-                        <p className="text-on-surface-variant text-sm">لا توجد أعمال بعد. أضف أول عمل لك.</p>
+                        <p className="text-on-surface-variant text-sm">{t('portfolio.empty')}</p>
                       ) : (
                         <div className="space-y-3">
                           {workerProfile.portfolio!.map((item, idx) => (
@@ -1316,12 +1320,12 @@ export default function WorkerDashboardPage() {
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="font-bold truncate">{item.title || '(بدون عنوان)'}</p>
+                                <p className="font-bold truncate">{item.title || t('portfolio.untitled')}</p>
                                 {item.description && (
                                   <p className="text-sm text-on-surface-variant line-clamp-2">{item.description}</p>
                                 )}
                                 <p className="text-xs text-on-surface-variant mt-1">
-                                  {(item.images || []).length} صورة
+                                  {t('portfolio.imagesCount', { count: (item.images || []).length })}
                                 </p>
                               </div>
                               <div className="flex gap-2">
@@ -1329,7 +1333,7 @@ export default function WorkerDashboardPage() {
                                   type="button"
                                   onClick={() => openEditPortfolioItem(idx)}
                                   className="p-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high"
-                                  aria-label="تعديل"
+                                  aria-label={t('portfolio.editAria')}
                                 >
                                   <Pencil className="w-4 h-4" />
                                 </button>
@@ -1338,7 +1342,7 @@ export default function WorkerDashboardPage() {
                                   onClick={() => deletePortfolioItem(idx)}
                                   disabled={profileSaving}
                                   className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                                  aria-label="حذف"
+                                  aria-label={t('portfolio.deleteAria')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1354,7 +1358,7 @@ export default function WorkerDashboardPage() {
                   {portfolioDraft && (
                     <div className="space-y-4 bg-surface-container-low p-4 rounded-xl">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">العنوان</label>
+                        <label className="text-xs font-bold block">{t('portfolio.labelTitle')}</label>
                         <input
                           type="text"
                           value={portfolioDraft.title}
@@ -1364,7 +1368,7 @@ export default function WorkerDashboardPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">الوصف</label>
+                        <label className="text-xs font-bold block">{t('portfolio.labelDescription')}</label>
                         <textarea
                           value={portfolioDraft.description}
                           onChange={(e) => setPortfolioDraft({ ...portfolioDraft, description: e.target.value })}
@@ -1373,7 +1377,7 @@ export default function WorkerDashboardPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">تاريخ الإنجاز (اختياري)</label>
+                        <label className="text-xs font-bold block">{t('portfolio.labelCompletedDate')}</label>
                         <input
                           type="date"
                           value={portfolioDraft.completedAt}
@@ -1383,7 +1387,7 @@ export default function WorkerDashboardPage() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold block">
-                          الصور <span className="text-on-surface-variant/60 font-normal">({portfolioDraft.images.length}/{MAX_PORTFOLIO_IMAGES})</span>
+                          {t('portfolio.labelImages')} <span className="text-on-surface-variant/60 font-normal">({portfolioDraft.images.length}/{MAX_PORTFOLIO_IMAGES})</span>
                         </label>
                         {portfolioDraft.images.length > 0 && (
                           <div className="grid grid-cols-3 gap-2">
@@ -1394,7 +1398,7 @@ export default function WorkerDashboardPage() {
                                   type="button"
                                   onClick={() => removeImageFromDraft(idx)}
                                   className="absolute top-1 left-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center"
-                                  aria-label="إزالة"
+                                  aria-label={t('portfolio.removeImageAria')}
                                 >
                                   <XIcon className="w-3 h-3" />
                                 </button>
@@ -1423,19 +1427,19 @@ export default function WorkerDashboardPage() {
                           className="w-full inline-flex items-center justify-center gap-2 bg-primary text-on-primary py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <ImageIcon className="w-4 h-4" />
-                          {uploadingPortfolioImages ? 'جاري الرفع...' : 'رفع صور من جهازي'}
+                          {uploadingPortfolioImages ? t('portfolio.uploading') : t('portfolio.uploadFromDevice')}
                         </button>
 
                         <details>
                           <summary className="text-xs text-on-surface-variant cursor-pointer hover:text-primary">
-                            أو الصق رابط صورة جاهزة
+                            {t('portfolio.orPasteUrl')}
                           </summary>
                           <div className="flex gap-2 mt-2">
                             <input
                               type="url"
                               value={portfolioImageInput}
                               onChange={(e) => setPortfolioImageInput(e.target.value)}
-                              placeholder="رابط صورة جديد"
+                              placeholder={t('portfolio.imageUrlPlaceholder')}
                               className="flex-1 bg-surface-container-lowest rounded-xl py-2 px-3 text-sm"
                             />
                             <button
@@ -1444,7 +1448,7 @@ export default function WorkerDashboardPage() {
                               disabled={!portfolioImageInput.trim() || portfolioDraft.images.length >= MAX_PORTFOLIO_IMAGES}
                               className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-40"
                             >
-                              إضافة
+                              {t('portfolio.addUrl')}
                             </button>
                           </div>
                         </details>
@@ -1456,7 +1460,7 @@ export default function WorkerDashboardPage() {
                           disabled={profileSaving || !portfolioDraft.title.trim()}
                           className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold disabled:opacity-40"
                         >
-                          {profileSaving ? 'جاري الحفظ...' : 'حفظ'}
+                          {profileSaving ? t('portfolio.saving') : t('portfolio.save')}
                         </button>
                         <button
                           type="button"
@@ -1464,7 +1468,7 @@ export default function WorkerDashboardPage() {
                           disabled={profileSaving}
                           className="flex-1 bg-surface-container-lowest py-3 rounded-xl font-bold disabled:opacity-40"
                         >
-                          إلغاء
+                          {t('portfolio.cancel')}
                         </button>
                       </div>
                     </div>
@@ -1476,7 +1480,7 @@ export default function WorkerDashboardPage() {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                       <Wallet className="w-5 h-5 text-primary" />
-                      باقات الأسعار
+                      {t('packages.title')}
                     </h3>
                     {!packageDraft && (
                       <button
@@ -1485,7 +1489,7 @@ export default function WorkerDashboardPage() {
                         className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
-                        إضافة باقة
+                        {t('packages.add')}
                       </button>
                     )}
                   </div>
@@ -1493,25 +1497,25 @@ export default function WorkerDashboardPage() {
                   {!packageDraft && (
                     <>
                       {(workerProfile.packages || []).length === 0 ? (
-                        <p className="text-on-surface-variant text-sm">لا توجد باقات بعد. أضف باقة لتظهر في صفحة ملفك العام.</p>
+                        <p className="text-on-surface-variant text-sm">{t('packages.empty')}</p>
                       ) : (
                         <div className="space-y-3">
                           {workerProfile.packages!.map((pkg, idx) => (
                             <div key={idx} className="flex items-start gap-4 p-3 rounded-xl bg-surface-container-low">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-baseline gap-2 flex-wrap">
-                                  <p className="font-bold truncate">{pkg.title || '(بدون عنوان)'}</p>
+                                  <p className="font-bold truncate">{pkg.title || t('packages.untitled')}</p>
                                   {pkg.price ? (
-                                    <span className="text-primary font-bold text-sm">{pkg.price} ج.م</span>
+                                    <span className="text-primary font-bold text-sm">{t('orders.priceEgp', { price: pkg.price })}</span>
                                   ) : (
-                                    <span className="text-on-surface-variant text-xs">تواصل لتسعير</span>
+                                    <span className="text-on-surface-variant text-xs">{t('packages.contactForPrice')}</span>
                                   )}
                                 </div>
                                 {pkg.description && (
                                   <p className="text-sm text-on-surface-variant line-clamp-2">{pkg.description}</p>
                                 )}
                                 <p className="text-xs text-on-surface-variant mt-1">
-                                  {(pkg.features || []).length} ميزة
+                                  {t('packages.featuresCount', { count: (pkg.features || []).length })}
                                 </p>
                               </div>
                               <div className="flex gap-2">
@@ -1519,7 +1523,7 @@ export default function WorkerDashboardPage() {
                                   type="button"
                                   onClick={() => openEditPackage(idx)}
                                   className="p-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high"
-                                  aria-label="تعديل"
+                                  aria-label={t('portfolio.editAria')}
                                 >
                                   <Pencil className="w-4 h-4" />
                                 </button>
@@ -1528,7 +1532,7 @@ export default function WorkerDashboardPage() {
                                   onClick={() => deletePackage(idx)}
                                   disabled={profileSaving}
                                   className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                                  aria-label="حذف"
+                                  aria-label={t('portfolio.deleteAria')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1543,7 +1547,7 @@ export default function WorkerDashboardPage() {
                   {packageDraft && (
                     <div className="space-y-4 bg-surface-container-low p-4 rounded-xl">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">عنوان الباقة</label>
+                        <label className="text-xs font-bold block">{t('packages.labelTitle')}</label>
                         <input
                           type="text"
                           value={packageDraft.title}
@@ -1553,7 +1557,7 @@ export default function WorkerDashboardPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">السعر (ج.م) — اتركه فارغاً للسعر المخصص</label>
+                        <label className="text-xs font-bold block">{t('packages.labelPrice')}</label>
                         <input
                           type="number"
                           min="0"
@@ -1563,7 +1567,7 @@ export default function WorkerDashboardPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">الوصف القصير</label>
+                        <label className="text-xs font-bold block">{t('packages.labelDescription')}</label>
                         <textarea
                           value={packageDraft.description}
                           onChange={(e) => setPackageDraft({ ...packageDraft, description: e.target.value })}
@@ -1572,12 +1576,12 @@ export default function WorkerDashboardPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold block">الميزات (واحدة في كل سطر)</label>
+                        <label className="text-xs font-bold block">{t('packages.labelFeatures')}</label>
                         <textarea
                           value={packageDraft.features}
                           onChange={(e) => setPackageDraft({ ...packageDraft, features: e.target.value })}
                           rows={4}
-                          placeholder={'تركيب وتوصيل\nبرمجة التطبيقات\nضمان 6 شهور'}
+                          placeholder={t('packages.featuresPlaceholder')}
                           className="w-full bg-surface-container-lowest rounded-xl py-2 px-3 text-sm"
                         />
                       </div>
@@ -1588,7 +1592,7 @@ export default function WorkerDashboardPage() {
                           disabled={profileSaving || !packageDraft.title.trim()}
                           className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold disabled:opacity-40"
                         >
-                          {profileSaving ? 'جاري الحفظ...' : 'حفظ'}
+                          {profileSaving ? t('packages.saving') : t('packages.save')}
                         </button>
                         <button
                           type="button"
@@ -1596,7 +1600,7 @@ export default function WorkerDashboardPage() {
                           disabled={profileSaving}
                           className="flex-1 bg-surface-container-lowest py-3 rounded-xl font-bold disabled:opacity-40"
                         >
-                          إلغاء
+                          {t('packages.cancel')}
                         </button>
                       </div>
                     </div>
@@ -1607,19 +1611,19 @@ export default function WorkerDashboardPage() {
                 <section className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-primary" />
-                    ساعات العمل
+                    {t('workHours.title')}
                   </h3>
 
                   {hasMixedSchedule(workerProfile.workingHours) && (
                     <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-700 text-sm flex gap-2">
                       <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <span>يوجد جدول مخصص بأوقات مختلفة لكل يوم — التعديل البسيط هنا سيستبدله بجدول موحد.</span>
+                      <span>{t('workHours.customScheduleWarning')}</span>
                     </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold block">من</label>
+                      <label className="text-xs font-bold block">{t('workHours.from')}</label>
                       <input
                         type="time"
                         value={hoursDraft.defaultFrom}
@@ -1628,7 +1632,7 @@ export default function WorkerDashboardPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold block">إلى</label>
+                      <label className="text-xs font-bold block">{t('workHours.to')}</label>
                       <input
                         type="time"
                         value={hoursDraft.defaultTo}
@@ -1638,7 +1642,7 @@ export default function WorkerDashboardPage() {
                     </div>
                   </div>
 
-                  <p className="text-xs font-bold mb-2">أيام الإجازة</p>
+                  <p className="text-xs font-bold mb-2">{t('workHours.daysOff')}</p>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {DAY_ORDER_KEYS.map(day => {
                       const isOff = hoursDraft.daysOff.includes(day)
@@ -1665,17 +1669,17 @@ export default function WorkerDashboardPage() {
                     disabled={profileSaving}
                     className="bg-primary text-on-primary px-6 py-3 rounded-xl font-bold disabled:opacity-40"
                   >
-                    {profileSaving ? 'جاري الحفظ...' : 'حفظ ساعات العمل'}
+                    {profileSaving ? t('workHours.saving') : t('workHours.save')}
                   </button>
                 </section>
 
                 {/* ─── Worker type toggle ─── */}
                 <section className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
-                  <h3 className="text-lg font-bold mb-4">نوع المزود</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('providerType.title')}</h3>
                   <div className="flex gap-3">
                     {([
-                      { value: 'individual' as const, label: 'فرد' },
-                      { value: 'company'    as const, label: 'شركة' },
+                      { value: 'individual' as const, label: t('providerType.individual') },
+                      { value: 'company'    as const, label: t('providerType.company') },
                     ]).map(opt => {
                       const active = workerProfile.typeOfWorker === opt.value
                       return (
@@ -1699,38 +1703,38 @@ export default function WorkerDashboardPage() {
 
                 {/* ─── Bio + skills + location editor ─── */}
                 <section className="bg-surface-container-lowest p-6 rounded-xl shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
-                  <h3 className="text-lg font-bold mb-4">المعلومات الشخصية</h3>
+                  <h3 className="text-lg font-bold mb-4">{t('personalInfo.title')}</h3>
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold block">العنوان المهني / الشعار</label>
+                      <label className="text-xs font-bold block">{t('personalInfo.labelTitle')}</label>
                       <input
                         type="text"
                         value={profileTextDraft.title}
                         onChange={(e) => setProfileTextDraft({ ...profileTextDraft, title: e.target.value })}
-                        placeholder="مثال: حلول كهربائية آمنة وذكية لمنزلك"
+                        placeholder={t('personalInfo.titlePlaceholder')}
                         maxLength={120}
                         className="w-full bg-surface-container-low rounded-xl py-3 px-3 text-sm"
                       />
-                      <p className="text-xs text-on-surface-variant">يظهر تحت اسمك في صفحة ملفك العام.</p>
+                      <p className="text-xs text-on-surface-variant">{t('personalInfo.titleHint')}</p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold block">نبذة عنك</label>
+                      <label className="text-xs font-bold block">{t('personalInfo.labelBio')}</label>
                       <textarea
                         value={profileTextDraft.bio}
                         onChange={(e) => setProfileTextDraft({ ...profileTextDraft, bio: e.target.value })}
                         rows={4}
-                        placeholder="اكتب نبذة قصيرة عن خبراتك وتخصصك..."
+                        placeholder={t('personalInfo.bioPlaceholder')}
                         className="w-full bg-surface-container-low rounded-xl py-3 px-3 text-sm"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-xs font-bold block">الموقع</label>
+                      <label className="text-xs font-bold block">{t('personalInfo.labelLocation')}</label>
                       <input
                         type="text"
                         value={profileTextDraft.location}
                         onChange={(e) => setProfileTextDraft({ ...profileTextDraft, location: e.target.value })}
-                        placeholder="مثال: القاهرة، مصر"
+                        placeholder={t('personalInfo.locationPlaceholder')}
                         className="w-full bg-surface-container-low rounded-xl py-3 px-3 text-sm"
                       />
                       {/* Map pin — separate from the text input above because
@@ -1743,12 +1747,12 @@ export default function WorkerDashboardPage() {
                         <div className="text-right flex-1 min-w-0">
                           <p className="text-sm font-bold flex items-center gap-1.5">
                             <MapPin className="w-4 h-4 text-primary" />
-                            الموقع على الخريطة
+                            {t('personalInfo.mapLocation')}
                           </p>
                           <p className="text-xs text-on-surface-variant mt-0.5">
                             {savedCoords
-                              ? `محدد: ${savedCoords.lat.toFixed(5)}, ${savedCoords.lng.toFixed(5)} — يظهر ملفك في فلتر "الأقرب إليك"`
-                              : 'لم تُحدد بعد — لن تظهر في فلتر "الأقرب إليك" حتى تحدد موقعك'}
+                              ? t('personalInfo.mapSet', { lat: savedCoords.lat.toFixed(5), lng: savedCoords.lng.toFixed(5) })
+                              : t('personalInfo.mapNotSet')}
                           </p>
                         </div>
                         <button
@@ -1758,18 +1762,18 @@ export default function WorkerDashboardPage() {
                           className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-container transition-colors shrink-0 disabled:opacity-50 flex items-center gap-1"
                         >
                           {savingCoords && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          {savedCoords ? 'تعديل على الخريطة' : 'تحديد على الخريطة'}
+                          {savedCoords ? t('personalInfo.editOnMap') : t('personalInfo.setOnMap')}
                         </button>
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold block">المهارات (افصل بينها بفاصلة)</label>
+                      <label className="text-xs font-bold block">{t('personalInfo.labelSkills')}</label>
                       <input
                         type="text"
                         value={profileTextDraft.skills}
                         onChange={(e) => setProfileTextDraft({ ...profileTextDraft, skills: e.target.value })}
-                        placeholder="مثال: نجارة، تصميم داخلي، ترميم"
+                        placeholder={t('personalInfo.skillsPlaceholder')}
                         className="w-full bg-surface-container-low rounded-xl py-3 px-3 text-sm"
                       />
                     </div>
@@ -1780,7 +1784,7 @@ export default function WorkerDashboardPage() {
                       disabled={profileSaving}
                       className="bg-primary text-on-primary px-6 py-3 rounded-xl font-bold disabled:opacity-40"
                     >
-                      {profileSaving ? 'جاري الحفظ...' : 'حفظ المعلومات'}
+                      {profileSaving ? t('personalInfo.saving') : t('personalInfo.save')}
                     </button>
                   </div>
                 </section>
@@ -1820,7 +1824,7 @@ export default function WorkerDashboardPage() {
                       onClick={() => setServiceError('')}
                       className="text-xs font-semibold underline hover:no-underline"
                     >
-                      إخفاء
+                      {t('services.hideForm')}
                     </button>
                   </div>
                 )}
@@ -1837,18 +1841,18 @@ export default function WorkerDashboardPage() {
                     noValidate
                   >
                     <h3 className="font-bold text-on-surface mb-4">
-                      {editingServiceId ? 'تعديل الخدمة' : 'إضافة خدمة جديدة'}
+                      {editingServiceId ? t('services.editTitle') : t('services.addTitle')}
                     </h3>
                     <div className="space-y-4">
                       {/* Service name */}
                       <div>
                         <label htmlFor="svc-name" className="block text-sm font-medium text-on-surface-variant mb-1">
-                          اسم الخدمة *
+                          {t('services.labelName')}
                         </label>
                         <input
                           id="svc-name"
                           type="text"
-                          placeholder="مثال: تركيب مكيف سبليت"
+                          placeholder={t('services.namePlaceholder')}
                           aria-invalid={serviceFormApi.formState.errors.name ? 'true' : 'false'}
                           className={`w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm text-right outline-none focus:ring-2 ${
                             serviceFormApi.formState.errors.name ? 'ring-2 ring-red-300 focus:ring-red-300' : 'focus:ring-primary/20'
@@ -1863,7 +1867,7 @@ export default function WorkerDashboardPage() {
                       {/* Category selector */}
                       <div>
                         <label htmlFor="svc-category" className="block text-sm font-medium text-on-surface-variant mb-1">
-                          الفئة
+                          {t('services.labelCategory')}
                         </label>
                         <select
                           id="svc-category"
@@ -1873,7 +1877,7 @@ export default function WorkerDashboardPage() {
                           }`}
                           {...serviceFormApi.register('categoryId')}
                         >
-                          <option value="">اختر الفئة</option>
+                          <option value="">{t('services.categoryChoose')}</option>
                           {availableCategories.map(cat => (
                             <option key={cat._id} value={cat._id}>{cat.name}</option>
                           ))}
@@ -1886,11 +1890,11 @@ export default function WorkerDashboardPage() {
                       {/* Description textarea */}
                       <div>
                         <label htmlFor="svc-description" className="block text-sm font-medium text-on-surface-variant mb-1">
-                          وصف الخدمة
+                          {t('services.labelDescription')}
                         </label>
                         <textarea
                           id="svc-description"
-                          placeholder="اكتب وصفاً تفصيلياً للخدمة..."
+                          placeholder={t('services.descPlaceholder')}
                           rows={3}
                           className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none resize-none"
                           {...serviceFormApi.register('description')}
@@ -1900,26 +1904,51 @@ export default function WorkerDashboardPage() {
                       {/* Payment type selector — fixed, hourly, or range */}
                       <div>
                         <label htmlFor="svc-type" className="block text-sm font-medium text-on-surface-variant mb-1">
-                          نوع الدفع
+                          {t('services.labelPaymentType')}
                         </label>
                         <select
                           id="svc-type"
                           className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none"
                           {...serviceFormApi.register('typeofService')}
                         >
-                          <option value="fixed">سعر ثابت</option>
-                          <option value="hourly">بالساعة</option>
-                          <option value="range">نطاق سعر (من - إلى)</option>
+                          <option value="fixed">{t('services.fixedPrice')}</option>
+                          <option value="hourly">{t('services.hourly')}</option>
+                          <option value="range">{t('services.range')}</option>
+                          <option value="custom">سعر مخصص (يحدّد عند الطلب)</option>
+                        </select>
+                      </div>
+
+                      {/* Payment timing — applies to every order against this service.
+                          Workers can decide whether the customer pays up front or after
+                          the work is done. Customer-initiated orders inherit this value;
+                          worker-initiated custom orders pick their own per-order. */}
+                      <div>
+                        <label htmlFor="svc-timing" className="block text-sm font-medium text-on-surface-variant mb-1">
+                          توقيت الدفع
+                        </label>
+                        <select
+                          id="svc-timing"
+                          className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                          {...serviceFormApi.register('paymentTiming')}
+                        >
+                          <option value="before">قبل الخدمة</option>
+                          <option value="after">بعد الخدمة</option>
                         </select>
                       </div>
 
                       {/* Price inputs — change based on payment type.
-                          For fixed/hourly we show one price; for range we show min+max. */}
-                      {serviceForm.typeofService === 'range' ? (
+                          For fixed/hourly we show one price; for range we show min+max.
+                          For "custom" we show no price input — the worker enters it
+                          per-order from the customer's profile. */}
+                      {serviceForm.typeofService === 'custom' ? (
+                        <p className="text-xs text-on-surface-variant bg-surface-container-low rounded-xl p-3">
+                          خدمة بسعر مخصص — يحدّد السعر عند إنشاء كل طلب.
+                        </p>
+                      ) : serviceForm.typeofService === 'range' ? (
                         <div className="flex gap-4">
                           <div className="flex-1">
                             <label htmlFor="svc-pmin" className="block text-sm font-medium text-on-surface-variant mb-1">
-                              أقل سعر (ج.م)
+                              {t('services.minPrice')}
                             </label>
                             <input
                               id="svc-pmin"
@@ -1937,7 +1966,7 @@ export default function WorkerDashboardPage() {
                           </div>
                           <div className="flex-1">
                             <label htmlFor="svc-pmax" className="block text-sm font-medium text-on-surface-variant mb-1">
-                              أعلى سعر (ج.م)
+                              {t('services.maxPrice')}
                             </label>
                             <input
                               id="svc-pmax"
@@ -1957,7 +1986,7 @@ export default function WorkerDashboardPage() {
                       ) : (
                         <div>
                           <label htmlFor="svc-price" className="block text-sm font-medium text-on-surface-variant mb-1">
-                            السعر (ج.م) {serviceForm.typeofService === 'hourly' ? 'لكل ساعة' : ''}
+                            {t('services.priceEgp')} {serviceForm.typeofService === 'hourly' ? t('services.perHour') : ''}
                           </label>
                           <input
                             id="svc-price"
@@ -1980,7 +2009,7 @@ export default function WorkerDashboardPage() {
                           for already-hosted assets. Images cap at MAX_SERVICE_IMAGES. */}
                       <div>
                         <label className="block text-sm font-medium text-on-surface-variant mb-1">
-                          صور الخدمة <span className="text-on-surface-variant/60">({serviceForm.images.length}/{MAX_SERVICE_IMAGES})</span>
+                          {t('services.labelImages')} <span className="text-on-surface-variant/60">({serviceForm.images.length}/{MAX_SERVICE_IMAGES})</span>
                         </label>
 
                         {/* Hidden native input — we click it from the visible button below
@@ -2005,14 +2034,14 @@ export default function WorkerDashboardPage() {
                             className="flex-1 inline-flex items-center justify-center gap-2 bg-primary text-white px-4 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ImageIcon className="w-4 h-4" />
-                            {uploadingServiceImages ? 'جاري الرفع...' : 'رفع صور من جهازي'}
+                            {uploadingServiceImages ? t('services.uploading') : t('services.uploadFromDevice')}
                           </button>
                         </div>
 
                         {/* Optional: paste an existing image URL */}
                         <details className="mb-2">
                           <summary className="text-xs text-on-surface-variant cursor-pointer hover:text-primary">
-                            أو الصق رابط صورة جاهزة
+                            {t('portfolio.orPasteUrl')}
                           </summary>
                           <div className="flex gap-2 mt-2">
                             <input
@@ -2029,7 +2058,7 @@ export default function WorkerDashboardPage() {
                               disabled={serviceForm.images.length >= MAX_SERVICE_IMAGES}
                               className="bg-primary text-white px-4 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
                             >
-                              إضافة
+                              {t('services.addUrl')}
                             </button>
                           </div>
                         </details>
@@ -2079,8 +2108,8 @@ export default function WorkerDashboardPage() {
                           className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait"
                         >
                           {serviceSaving
-                            ? 'جاري الحفظ...'
-                            : editingServiceId ? 'حفظ التعديلات' : 'إضافة الخدمة'}
+                            ? t('services.saving')
+                            : editingServiceId ? t('services.saveEdits') : t('services.addService')}
                         </button>
                         <button
                           type="button"
@@ -2088,7 +2117,7 @@ export default function WorkerDashboardPage() {
                           disabled={serviceSaving}
                           className="flex-1 bg-surface-container-high text-on-surface-variant py-3 rounded-xl font-bold hover:opacity-80 transition-opacity disabled:opacity-50"
                         >
-                          إلغاء
+                          {t('services.cancel')}
                         </button>
                       </div>
                     </div>
@@ -2102,8 +2131,8 @@ export default function WorkerDashboardPage() {
                   /* Empty state — shown when worker has no services yet */
                   <div className="text-center py-20 bg-surface-container-lowest rounded-xl">
                     <Briefcase className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-                    <p className="text-on-surface-variant text-lg mb-2">لا توجد خدمات بعد</p>
-                    <p className="text-sm text-on-surface-variant/60">أضف خدمتك الأولى لتبدأ في استقبال الطلبات</p>
+                    <p className="text-on-surface-variant text-lg mb-2">{t('services.noneTitle')}</p>
+                    <p className="text-sm text-on-surface-variant/60">{t('services.noneBody')}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2119,15 +2148,15 @@ export default function WorkerDashboardPage() {
 
                         {/* Description text */}
                         <p className="text-on-surface-variant text-sm mb-3 line-clamp-2">
-                          {service.description || 'بدون وصف'}
+                          {service.description || t('services.noDescription')}
                         </p>
 
                         {/* Middle row: price + type badge + approval status */}
                         <div className="flex items-center gap-3 mb-3 flex-wrap">
                           <span className="text-lg font-bold text-primary">
                             {service.typeofService === 'range'
-                              ? `${service.priceRange?.min ?? 0} - ${service.priceRange?.max ?? 0} ج.م`
-                              : `${service.price} ج.م`}
+                              ? t('services.rangeFormat', { min: service.priceRange?.min ?? 0, max: service.priceRange?.max ?? 0 })
+                              : t('services.priceFormat', { price: service.price })}
                           </span>
                           {/* Type badge: different colors for each payment type */}
                           <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -2137,7 +2166,7 @@ export default function WorkerDashboardPage() {
                               ? 'bg-purple-50 text-purple-600'
                               : 'bg-green-50 text-green-600'
                           }`}>
-                            {service.typeofService === 'hourly' ? 'بالساعة' : service.typeofService === 'range' ? 'نطاق' : 'سعر ثابت'}
+                            {service.typeofService === 'hourly' ? t('services.kindHourly') : service.typeofService === 'range' ? t('services.kindRange') : t('services.kindFixed')}
                           </span>
 
                           {/* Approval status badge — shows whether admin approved/rejected/is reviewing */}
@@ -2146,9 +2175,9 @@ export default function WorkerDashboardPage() {
                             service.approvalStatus === 'rejected' ? 'bg-red-50 text-red-600' :
                             'bg-amber-50 text-amber-600'
                           }`}>
-                            {service.approvalStatus === 'approved' ? 'معتمد' :
-                             service.approvalStatus === 'rejected' ? 'مرفوض' :
-                             'قيد المراجعة'}
+                            {service.approvalStatus === 'approved' ? t('services.approvalApproved') :
+                             service.approvalStatus === 'rejected' ? t('services.approvalRejected') :
+                             t('services.approvalPending')}
                           </span>
                         </div>
 
@@ -2164,7 +2193,7 @@ export default function WorkerDashboardPage() {
                         {deletingServiceId === service._id ? (
                           <div className="flex items-center justify-between gap-3 bg-red-50/60 border border-red-100 rounded-lg px-3 py-2">
                             <span className="text-xs text-red-700 font-semibold">
-                              هل أنت متأكد من حذف هذه الخدمة؟
+                              {t('services.confirmDelete')}
                             </span>
                             <div className="flex items-center gap-2">
                               <button
@@ -2173,7 +2202,7 @@ export default function WorkerDashboardPage() {
                                 disabled={deletingInFlight}
                                 className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors disabled:opacity-50"
                               >
-                                {deletingInFlight ? 'جاري الحذف...' : 'تأكيد الحذف'}
+                                {deletingInFlight ? t('services.deleting') : t('services.confirmDeleteBtn')}
                               </button>
                               <button
                                 type="button"
@@ -2181,7 +2210,7 @@ export default function WorkerDashboardPage() {
                                 disabled={deletingInFlight}
                                 className="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant text-xs font-bold hover:opacity-80 transition-opacity disabled:opacity-50"
                               >
-                                تراجع
+                                {t('services.backOut')}
                               </button>
                             </div>
                           </div>
@@ -2204,12 +2233,12 @@ export default function WorkerDashboardPage() {
                                     }`} />
                                   </button>
                                   <span className="text-xs text-on-surface-variant">
-                                    {service.active ? 'نشط' : 'غير نشط'}
+                                    {service.active ? t('services.active') : t('services.inactive')}
                                   </span>
                                 </>
                               ) : (
                                 <span className="text-xs text-on-surface-variant/50">
-                                  {service.approvalStatus === 'pending' ? 'بانتظار الموافقة' : 'مرفوض'}
+                                  {service.approvalStatus === 'pending' ? t('services.approvalAwaiting') : t('services.approvalRejectedShort')}
                                 </span>
                               )}
                             </div>
@@ -2261,8 +2290,8 @@ export default function WorkerDashboardPage() {
                     <ShoppingBag className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
                     <p className="text-on-surface-variant text-lg">
                       {activeTab === 'active_orders'
-                        ? 'لا توجد طلبات قيد التنفيذ'
-                        : 'لا يوجد سجل طلبات بعد'}
+                        ? t('orders.emptyInProgress')
+                        : t('orders.emptyHistory')}
                     </p>
                   </div>
                 ) : (
@@ -2270,7 +2299,7 @@ export default function WorkerDashboardPage() {
                   <div className="space-y-4">
                     {orders.map(order => {
                       // Look up the status badge config, fall back to "pending" if unknown
-                      const badge = statusConfig[order.status] || statusConfig.pending
+                      const badge = statusColors[order.status] || statusColors.pending
                       return (
                         <div
                           key={order._id}
@@ -2284,11 +2313,11 @@ export default function WorkerDashboardPage() {
                                   category name alone for older orders that pre-date
                                   serviceId being required. */}
                               <h3 className="font-bold text-on-surface text-lg truncate">
-                                {order.serviceId?.name || order.categoryId?.name || 'خدمة عامة'}
+                                {order.customTitle || order.serviceId?.name || order.categoryId?.name || t('orders.fallbackServiceName')}
                               </h3>
                               {order.serviceId?.name && order.categoryId?.name && (
                                 <p className="text-xs text-on-surface-variant mt-0.5">
-                                  الفئة: {order.categoryId.name}
+                                  {t('orders.category', { name: order.categoryId.name })}
                                 </p>
                               )}
                               {order.description && (
@@ -2296,10 +2325,36 @@ export default function WorkerDashboardPage() {
                                   {order.description}
                                 </p>
                               )}
+                              {order.problemImages && order.problemImages.length > 0 && (
+                                <div className="mt-3">
+                                  <p className="text-xs font-bold text-on-surface-variant mb-2">
+                                    صور المشكلة من العميل ({order.problemImages.length})
+                                  </p>
+                                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                    {order.problemImages.map((url, idx) => (
+                                      <a
+                                        key={url}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block aspect-square rounded-lg overflow-hidden bg-surface-container-low hover:opacity-80 transition-opacity"
+                                      >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={url}
+                                          alt={`صورة المشكلة ${idx + 1}`}
+                                          className="w-full h-full object-cover"
+                                          loading="lazy"
+                                        />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             {/* Status badge — colored pill */}
                             <span className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 ${badge.bg} ${badge.text}`}>
-                              {badge.label}
+                              {t(badge.key as any)}
                             </span>
                           </div>
 
@@ -2328,7 +2383,7 @@ export default function WorkerDashboardPage() {
                               </Link>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <span className="text-sm text-on-surface-variant/60">عميل غير معروف</span>
+                                <span className="text-sm text-on-surface-variant/60">{t('orders.unknownCustomer')}</span>
                               </div>
                             )}
 
@@ -2362,7 +2417,7 @@ export default function WorkerDashboardPage() {
                                     }}
                                     className="text-primary font-bold hover:underline mr-1"
                                   >
-                                    (عرض على الخريطة)
+                                    {t('orders.viewOnMap')}
                                   </button>
                                 )}
                               </div>
@@ -2372,9 +2427,9 @@ export default function WorkerDashboardPage() {
                             {order.paymentMode && (
                               <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-surface-container-low text-on-surface-variant">
                                 {order.paymentMode === 'card' ? (
-                                  <><CreditCard className="w-3 h-3" /> بطاقة</>
+                                  <><CreditCard className="w-3 h-3" /> {t('orders.card')}</>
                                 ) : (
-                                  <><Wallet className="w-3 h-3" /> نقدي عند الاستلام</>
+                                  <><Wallet className="w-3 h-3" /> {t('orders.cash')}</>
                                 )}
                               </span>
                             )}
@@ -2382,7 +2437,7 @@ export default function WorkerDashboardPage() {
                             {/* Price if available */}
                             {order.proposedPrice ? (
                               <span className="text-sm font-bold text-primary ms-auto">
-                                {order.proposedPrice} ج.م
+                                {t('orders.priceEgp', { price: order.proposedPrice })}
                               </span>
                             ) : null}
                           </div>
@@ -2390,7 +2445,7 @@ export default function WorkerDashboardPage() {
                           {/* Rejection reason (history tab only — already rejected) */}
                           {order.rejectionReason && order.status === 'rejected' && (
                             <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">
-                              سبب الرفض: {order.rejectionReason}
+                              {t('orders.rejectionReason', { reason: order.rejectionReason })}
                             </p>
                           )}
 
@@ -2406,11 +2461,11 @@ export default function WorkerDashboardPage() {
                                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                 <div className="min-w-0 flex-1">
                                   <p className="font-bold text-amber-900 text-sm">
-                                    العميل طلب إلغاء هذه الخدمة
+                                    {t('orders.cancellationRequestedTitle')}
                                   </p>
                                   {order.cancellationRequest.reason && (
                                     <p className="text-sm text-amber-900/90 mt-1">
-                                      السبب: {order.cancellationRequest.reason}
+                                      {t('orders.cancellationReason', { reason: order.cancellationRequest.reason })}
                                     </p>
                                   )}
                                 </div>
@@ -2422,7 +2477,7 @@ export default function WorkerDashboardPage() {
                                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors"
                                 >
                                   <Check className="w-4 h-4" />
-                                  قبول الإلغاء
+                                  {t('orders.acceptCancellation')}
                                 </button>
                                 <button
                                   type="button"
@@ -2430,7 +2485,7 @@ export default function WorkerDashboardPage() {
                                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-amber-300 text-amber-900 text-sm font-bold hover:bg-amber-100 transition-colors"
                                 >
                                   <XIcon className="w-4 h-4" />
-                                  رفض الإلغاء
+                                  {t('orders.rejectCancellation')}
                                 </button>
                               </div>
                             </div>
@@ -2445,13 +2500,13 @@ export default function WorkerDashboardPage() {
 
                           {order.status === 'completed' && order.customerId && (
                             <div className="pt-3 mt-3 border-t border-outline-variant/10 flex items-center justify-between gap-3">
-                              <span className="text-sm text-on-surface-variant">قيّم تجربتك مع هذا العميل</span>
+                              <span className="text-sm text-on-surface-variant">{t('orders.rateCustomerPrompt')}</span>
                               {/* Server-side `hasWorkerReview` is the source of truth across page
                                   reloads. `reviewedOrderIds` is the in-session add-on for orders
                                   just rated without a refetch. Either being true locks the button. */}
                               {(order.hasWorkerReview || reviewedOrderIds.has(order._id)) ? (
                                 <span className="text-sm text-on-surface-variant px-3 py-2 rounded-lg bg-surface-container-low cursor-not-allowed">
-                                  تم التقييم
+                                  {t('orders.rated')}
                                 </span>
                               ) : (
                                 <button
@@ -2459,12 +2514,12 @@ export default function WorkerDashboardPage() {
                                   onClick={() => setRateTarget({
                                     orderId: order._id,
                                     customerName: order.customerId
-                                      ? `${order.customerId.firstName || ''} ${order.customerId.lastName || ''}`.trim() || 'العميل'
-                                      : 'العميل',
+                                      ? `${order.customerId.firstName || ''} ${order.customerId.lastName || ''}`.trim() || t('orders.fallbackCustomer')
+                                      : t('orders.fallbackCustomer'),
                                   })}
                                   className="text-sm bg-primary text-on-primary px-4 py-2 rounded-lg font-bold hover:bg-primary-container transition-colors"
                                 >
-                                  قيم العميل
+                                  {t('orders.rateCustomer')}
                                 </button>
                               )}
                             </div>
@@ -2486,7 +2541,7 @@ export default function WorkerDashboardPage() {
                                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-bold hover:bg-primary-container transition-colors"
                                   >
                                     <Check className="w-4 h-4" />
-                                    قبول
+                                    {t('orders.accept')}
                                   </button>
                                   <button
                                     type="button"
@@ -2494,9 +2549,14 @@ export default function WorkerDashboardPage() {
                                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors"
                                   >
                                     <XIcon className="w-4 h-4" />
-                                    رفض
+                                    {t('orders.reject')}
                                   </button>
                                 </>
+                              )}
+                              {order.status === 'pending_customer_confirmation' && (
+                                <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 text-xs font-bold">
+                                  في انتظار تأكيد العميل
+                                </span>
                               )}
                               {order.status === 'accepted' && (
                                 <>
@@ -2506,7 +2566,7 @@ export default function WorkerDashboardPage() {
                                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-bold hover:bg-primary-container transition-colors"
                                   >
                                     <Play className="w-4 h-4" />
-                                    ابدأ العمل
+                                    {t('orders.startWork')}
                                   </button>
                                   <button
                                     type="button"
@@ -2514,7 +2574,7 @@ export default function WorkerDashboardPage() {
                                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant text-sm font-semibold hover:bg-surface-container-high transition-colors"
                                   >
                                     <XIcon className="w-4 h-4" />
-                                    إلغاء
+                                    {t('orders.cancel')}
                                   </button>
                                 </>
                               )}
@@ -2525,7 +2585,7 @@ export default function WorkerDashboardPage() {
                                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-colors"
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
-                                  إنهاء الخدمة
+                                  {t('orders.complete')}
                                 </button>
                               )}
                             </div>
@@ -2600,10 +2660,10 @@ export default function WorkerDashboardPage() {
                     <div className="bg-gradient-to-br from-primary to-primary-container text-white rounded-2xl p-8 mb-6 shadow-lg shadow-primary/20">
                       <div className="flex items-start justify-between gap-4 mb-6">
                         <div>
-                          <p className="text-sm opacity-80 mb-1">الرصيد المتاح للسحب</p>
+                          <p className="text-sm opacity-80 mb-1">{t('wallet.availableBalance')}</p>
                           <p className="text-4xl md:text-5xl font-black tracking-tight">
                             {wallet?.balance ?? 0}
-                            <span className="text-xl font-medium opacity-80"> ج.م</span>
+                            <span className="text-xl font-medium opacity-80"> {t('wallet.currency')}</span>
                           </p>
                         </div>
                         <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
@@ -2615,19 +2675,19 @@ export default function WorkerDashboardPage() {
                         <div className="bg-white/10 rounded-xl p-3">
                           <div className="flex items-center gap-1.5 opacity-80 mb-1">
                             <TrendingUp className="w-3.5 h-3.5" />
-                            <span>إجمالي الأرباح</span>
+                            <span>{t('wallet.totalEarnings')}</span>
                           </div>
                           <p className="font-bold text-lg">
-                            {wallet?.lifetimeEarnings ?? 0} ج.م
+                            {t('orders.priceEgp', { price: wallet?.lifetimeEarnings ?? 0 })}
                           </p>
                         </div>
                         <div className="bg-white/10 rounded-xl p-3">
                           <div className="flex items-center gap-1.5 opacity-80 mb-1">
                             <ArrowDownCircle className="w-3.5 h-3.5" />
-                            <span>إجمالي المسحوب</span>
+                            <span>{t('wallet.totalWithdrawn')}</span>
                           </div>
                           <p className="font-bold text-lg">
-                            {wallet?.lifetimeWithdrawn ?? 0} ج.م
+                            {t('orders.priceEgp', { price: wallet?.lifetimeWithdrawn ?? 0 })}
                           </p>
                         </div>
                       </div>
@@ -2639,21 +2699,21 @@ export default function WorkerDashboardPage() {
                         className="w-full bg-white text-primary py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 hover:bg-white/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <ArrowDownCircle className="w-5 h-5" />
-                        سحب الأرباح
+                        {t('wallet.withdraw')}
                       </button>
                     </div>
 
                     {/* Transactions list */}
                     <div className="bg-surface-container-lowest rounded-xl p-6">
                       <h3 className="text-lg font-bold mb-4 border-r-4 border-primary pr-3">
-                        آخر المعاملات
+                        {t('wallet.recentTx')}
                       </h3>
 
                       {walletTransactions.length === 0 ? (
                         <div className="text-center py-12 text-on-surface-variant">
                           <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                          <p>لا توجد معاملات بعد.</p>
-                          <p className="text-xs mt-1">ستظهر هنا كل دفعة تصلك عند إنجاز طلب.</p>
+                          <p>{t('wallet.noneTitle')}</p>
+                          <p className="text-xs mt-1">{t('wallet.noneSub')}</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -2677,7 +2737,7 @@ export default function WorkerDashboardPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-on-surface text-sm truncate">
-                                    {tx.note || (isCredit ? 'دفعة' : 'سحب')}
+                                    {tx.note || (isCredit ? t('wallet.txDefaultCredit') : t('wallet.txDefaultDebit'))}
                                   </p>
                                   <p className="text-xs text-on-surface-variant">
                                     {new Date(tx.createdAt).toLocaleDateString('ar-EG', {
@@ -2689,7 +2749,7 @@ export default function WorkerDashboardPage() {
                                 <div className={`text-sm font-black shrink-0 ${
                                   isCredit ? 'text-green-600' : 'text-amber-600'
                                 }`}>
-                                  {isCredit ? '+' : '-'}{tx.amount} ج.م
+                                  {isCredit ? '+' : '-'}{t('orders.priceEgp', { price: tx.amount })}
                                 </div>
                               </div>
                             )
@@ -2715,6 +2775,15 @@ export default function WorkerDashboardPage() {
         <WithdrawModal
           balance={wallet?.balance || 0}
           onClose={() => setShowWithdrawModal(false)}
+          onSuccess={() => {
+            // Refresh wallet so the new pending withdrawal shows immediately.
+            api.getWithAuth('/worker/wallet')
+              .then(data => {
+                setWallet(data.wallet)
+                setWalletTransactions(data.transactions || [])
+              })
+              .catch(() => { /* silent — modal already showed success */ })
+          }}
         />
       )}
 
@@ -2737,10 +2806,10 @@ export default function WorkerDashboardPage() {
               <div>
                 <h2 className="flex items-center gap-2 text-xl font-black text-on-surface">
                   <FileCheck2 className="w-6 h-6 text-green-600" />
-                  تقرير إنجاز الخدمة
+                  {t('completionModal.title')}
                 </h2>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  {completingOrder.serviceId?.name || completingOrder.categoryId?.name || 'الطلب'}
+                  {completingOrder.serviceId?.name || completingOrder.categoryId?.name || t('completionModal.fallbackOrder')}
                   {completingOrder.customerId && ` • ${completingOrder.customerId.firstName} ${completingOrder.customerId.lastName}`}
                 </p>
               </div>
@@ -2757,20 +2826,20 @@ export default function WorkerDashboardPage() {
             {/* Body */}
             <div className="p-6 space-y-5">
               <p className="text-sm text-on-surface-variant">
-                أكمل التفاصيل التالية لإثبات أن العمل قد أُنجز. سيرى العميل التقرير مع الصور في صفحة طلباته.
+                {t('completionModal.intro')}
               </p>
 
               {/* Details textarea */}
               <div>
                 <label className="block text-sm font-bold text-on-surface mb-2">
-                  تفاصيل العمل المنجز <span className="text-error">*</span>
+                  {t('completionModal.labelDetails')} <span className="text-error">*</span>
                 </label>
                 <textarea
                   value={completionDetails}
                   onChange={e => setCompletionDetails(e.target.value)}
                   rows={4}
                   maxLength={2000}
-                  placeholder="مثال: تم تركيب الحنفية الجديدة وإصلاح التسريب تحت الحوض. تم اختبار التدفق والضغط وكل شيء يعمل بشكل صحيح."
+                  placeholder={t('completionModal.detailsPlaceholder')}
                   className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none"
                 />
                 <p className="text-xs text-on-surface-variant mt-1 text-left">
@@ -2781,9 +2850,9 @@ export default function WorkerDashboardPage() {
               {/* Images */}
               <div>
                 <label className="block text-sm font-bold text-on-surface mb-2">
-                  صور العمل المنجز <span className="text-error">*</span>
+                  {t('completionModal.labelImages')} <span className="text-error">*</span>
                   <span className="text-xs font-normal text-on-surface-variant mr-2">
-                    (صورة واحدة على الأقل، حتى {MAX_COMPLETION_IMAGES} صور)
+                    {t('completionModal.imagesHelper', { max: MAX_COMPLETION_IMAGES })}
                   </span>
                 </label>
 
@@ -2797,7 +2866,7 @@ export default function WorkerDashboardPage() {
                           type="button"
                           onClick={() => removeCompletionImage(idx)}
                           className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="إزالة"
+                          title={t('completionModal.removeAria')}
                         >
                           <XIcon className="w-3.5 h-3.5" />
                         </button>
@@ -2824,13 +2893,13 @@ export default function WorkerDashboardPage() {
                     {completionUploading ? (
                       <>
                         <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                        <span className="text-sm text-on-surface-variant">جاري الرفع...</span>
+                        <span className="text-sm text-on-surface-variant">{t('completionModal.uploading')}</span>
                       </>
                     ) : (
                       <>
                         <ImageIcon className="w-5 h-5 text-primary" />
                         <span className="text-sm font-medium text-on-surface">
-                          اختر صور من جهازك
+                          {t('completionModal.pickFromDevice')}
                         </span>
                       </>
                     )}
@@ -2854,7 +2923,7 @@ export default function WorkerDashboardPage() {
                 disabled={completionSubmitting || completionUploading}
                 className="px-5 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface font-semibold hover:bg-surface-container-high disabled:opacity-50"
               >
-                إلغاء
+                {t('completionModal.cancel')}
               </button>
               <button
                 type="button"
@@ -2865,12 +2934,12 @@ export default function WorkerDashboardPage() {
                 {completionSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    جاري الإرسال...
+                    {t('completionModal.sending')}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    تأكيد الإنجاز
+                    {t('completionModal.submit')}
                   </>
                 )}
               </button>
@@ -2917,28 +2986,82 @@ export default function WorkerDashboardPage() {
 }
 
 // =============================================================================
-// WithdrawModal — static placeholder for the payout flow
+// WithdrawModal — real Paymob payout flow
 // =============================================================================
-// The UI is fully built so the worker can see the feature, but the submit
-// button is intentionally disconnected from any backend. When the real payout
-// pipeline (Paymob or bank transfer) is implemented later, the onSubmit body
-// here is the one spot that needs wiring.
+// Lets the worker pick a destination (bank / InstaPay / mobile wallet) and
+// submit a withdrawal. The submit handler first PATCHes the worker's saved
+// payout info, then POSTs the withdrawal. The wallet balance is reserved
+// atomically server-side, so a double-click can't overdraw.
 //
-// Kept in-file (not a separate component file) because it's a one-off and
-// doesn't warrant its own module; moving it later is trivial if needed.
-function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => void }) {
-  const [method, setMethod] = useState<'card' | 'bank'>('card')
+// onSuccess is called when the backend accepts the request — the parent
+// uses it to refresh the wallet panel.
+// =============================================================================
+function WithdrawModal({
+  balance,
+  onClose,
+  onSuccess,
+}: {
+  balance: number
+  onClose: () => void
+  onSuccess?: () => void
+}) {
+  const [method, setMethod] = useState<'bank' | 'instapay' | 'wallet'>('instapay')
   const [amount, setAmount] = useState(balance > 0 ? String(balance) : '')
-  const [cardNumber, setCardNumber] = useState('')
-  const [bankAccount, setBankAccount] = useState('')
-  const [showNotice, setShowNotice] = useState(false)
+  const [bankAccountNumber, setBankAccountNumber] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [accountHolderName, setAccountHolderName] = useState('')
+  const [instapayAlias, setInstapayAlias] = useState('')
+  const [walletPhone, setWalletPhone] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const t = useTranslations('dashboard')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Prefill any previously saved destination so the worker doesn't retype it
+  // on every withdrawal. Errors are silent — this is purely a convenience.
+  useEffect(() => {
+    api.getWithAuth('/worker/payouts/info')
+      .then(data => {
+        const info = data?.payoutInfo
+        if (!info) return
+        if (info.method) setMethod(info.method)
+        if (info.bankAccountNumber) setBankAccountNumber(info.bankAccountNumber)
+        if (info.bankName) setBankName(info.bankName)
+        if (info.accountHolderName) setAccountHolderName(info.accountHolderName)
+        if (info.instapayAlias) setInstapayAlias(info.instapayAlias)
+        if (info.walletPhone) setWalletPhone(info.walletPhone)
+      })
+      .catch(() => { /* no saved info yet — start with empty form */ })
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Intentionally no backend call. Show the "coming soon" notice inline
-    // so the worker sees their form wasn't lost — they just need to wait
-    // until the real payout flow is wired.
-    setShowNotice(true)
+    setError('')
+    const amt = Number(amount)
+    if (!Number.isFinite(amt) || amt <= 0 || amt > balance) {
+      setError(t('withdrawModal.errAmount'))
+      return
+    }
+    setSubmitting(true)
+    try {
+      // Save / update payout info first so the next withdrawal can skip
+      // re-entering it. The endpoint validates per-method fields itself.
+      await api.postWithAuth('/worker/payouts/info', {
+        method,
+        bankAccountNumber,
+        bankName,
+        accountHolderName,
+        instapayAlias,
+        walletPhone,
+      })
+      await api.postWithAuth('/worker/payouts/withdraw', { amount: amt })
+      setSuccess(true)
+      onSuccess?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('withdrawModal.errGeneric'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -2952,10 +3075,10 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
           <div>
             <h2 className="flex items-center gap-2 text-xl font-black text-on-surface">
               <ArrowDownCircle className="w-6 h-6 text-primary" />
-              سحب الأرباح
+              {t('withdrawModal.title')}
             </h2>
             <p className="text-sm text-on-surface-variant mt-1">
-              الرصيد المتاح: <span className="font-bold text-on-surface">{balance} ج.م</span>
+              <span className="font-bold text-on-surface">{t('withdrawModal.availableBalance', { amount: balance })}</span>
             </p>
           </div>
           <button
@@ -2971,7 +3094,7 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
           {/* Amount */}
           <div>
             <label className="block text-sm font-bold text-on-surface mb-2">
-              المبلغ المراد سحبه <span className="text-error">*</span>
+              {t('withdrawModal.labelAmount')} <span className="text-error">*</span>
             </label>
             <div className="relative">
               <input
@@ -2984,7 +3107,7 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 pe-14 text-on-surface text-lg font-bold focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
               />
               <span className="absolute inset-y-0 end-4 flex items-center text-on-surface-variant text-sm">
-                ج.م
+                {t('withdrawModal.currency')}
               </span>
             </div>
             <button
@@ -2992,27 +3115,39 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
               onClick={() => setAmount(String(balance))}
               className="text-xs text-primary hover:underline mt-1 font-medium"
             >
-              سحب الرصيد بالكامل ({balance} ج.م)
+              {t('withdrawModal.withdrawAll', { amount: balance })}
             </button>
           </div>
 
-          {/* Method selector */}
+          {/* Method selector — Paymob payouts support bank / InstaPay / wallet */}
           <div>
             <label className="block text-sm font-bold text-on-surface mb-2">
-              طريقة الاستلام <span className="text-error">*</span>
+              {t('withdrawModal.labelMethod')} <span className="text-error">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setMethod('card')}
+                onClick={() => setMethod('instapay')}
                 className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1.5 ${
-                  method === 'card'
+                  method === 'instapay'
                     ? 'border-primary bg-primary/5'
                     : 'border-outline-variant/30 hover:border-outline-variant/60'
                 }`}
               >
-                <CreditCard className={`w-6 h-6 ${method === 'card' ? 'text-primary' : 'text-on-surface-variant'}`} />
-                <span className="text-sm font-semibold text-on-surface">بطاقة</span>
+                <CreditCard className={`w-6 h-6 ${method === 'instapay' ? 'text-primary' : 'text-on-surface-variant'}`} />
+                <span className="text-sm font-semibold text-on-surface">{t('withdrawModal.methodInstapay')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod('wallet')}
+                className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-1.5 ${
+                  method === 'wallet'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-outline-variant/30 hover:border-outline-variant/60'
+                }`}
+              >
+                <Wallet className={`w-6 h-6 ${method === 'wallet' ? 'text-primary' : 'text-on-surface-variant'}`} />
+                <span className="text-sm font-semibold text-on-surface">{t('withdrawModal.methodWallet')}</span>
               </button>
               <button
                 type="button"
@@ -3024,51 +3159,99 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
                 }`}
               >
                 <Landmark className={`w-6 h-6 ${method === 'bank' ? 'text-primary' : 'text-on-surface-variant'}`} />
-                <span className="text-sm font-semibold text-on-surface">حساب بنكي</span>
+                <span className="text-sm font-semibold text-on-surface">{t('withdrawModal.methodBank')}</span>
               </button>
             </div>
           </div>
 
           {/* Destination details (changes based on method) */}
-          {method === 'card' ? (
+          {method === 'instapay' && (
             <div>
               <label className="block text-sm font-bold text-on-surface mb-2">
-                رقم البطاقة
+                {t('withdrawModal.labelInstapay')} <span className="text-error">*</span>
               </label>
               <input
                 type="text"
-                value={cardNumber}
-                onChange={e => setCardNumber(e.target.value.replace(/\s+/g, '').slice(0, 19))}
-                placeholder="•••• •••• •••• ••••"
-                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface font-mono tracking-wider focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                value={instapayAlias}
+                onChange={e => setInstapayAlias(e.target.value.trim())}
+                placeholder="name@instapay"
+                required
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
               />
             </div>
-          ) : (
+          )}
+
+          {method === 'wallet' && (
             <div>
               <label className="block text-sm font-bold text-on-surface mb-2">
-                رقم الحساب البنكي / IBAN
+                {t('withdrawModal.labelWalletPhone')} <span className="text-error">*</span>
               </label>
               <input
-                type="text"
-                value={bankAccount}
-                onChange={e => setBankAccount(e.target.value)}
-                placeholder="EG00 0000 0000 0000 0000 0000 000"
+                type="tel"
+                value={walletPhone}
+                onChange={e => setWalletPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="01012345678"
+                required
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface font-mono focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
               />
             </div>
           )}
 
-          {/* Coming-soon notice (shown after submit attempt) */}
-          {showNotice && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
-              <Banknote className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-bold text-amber-900 mb-0.5">ميزة السحب قادمة قريباً</p>
-                <p className="text-amber-800">
-                  نعمل حالياً على تفعيل السحب الفوري إلى البطاقات والحسابات البنكية.
-                  سنخبرك فور تفعيل الخدمة.
-                </p>
+          {method === 'bank' && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-bold text-on-surface mb-2">
+                  {t('withdrawModal.labelAccountHolder')} <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={accountHolderName}
+                  onChange={e => setAccountHolderName(e.target.value)}
+                  required
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                />
               </div>
+              <div>
+                <label className="block text-sm font-bold text-on-surface mb-2">
+                  {t('withdrawModal.labelBankName')}
+                </label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-on-surface mb-2">
+                  {t('withdrawModal.labelBankNumber')} <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={bankAccountNumber}
+                  onChange={e => setBankAccountNumber(e.target.value)}
+                  placeholder="EG00 0000 0000 0000 0000 0000 000"
+                  required
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface font-mono focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Status messages */}
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold text-green-900 mb-0.5">{t('withdrawModal.successTitle')}</p>
+                <p className="text-green-800">{t('withdrawModal.successBody')}</p>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
@@ -3079,16 +3262,22 @@ function WithdrawModal({ balance, onClose }: { balance: number; onClose: () => v
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface font-semibold hover:bg-surface-container-high"
             >
-              إغلاق
+              {success ? t('withdrawModal.done') : t('withdrawModal.close')}
             </button>
-            <button
-              type="submit"
-              disabled={!amount || Number(amount) <= 0 || Number(amount) > balance}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ArrowDownCircle className="w-4 h-4" />
-              تأكيد السحب
-            </button>
+            {!success && (
+              <button
+                type="submit"
+                disabled={submitting || !amount || Number(amount) <= 0 || Number(amount) > balance}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ArrowDownCircle className="w-4 h-4" />
+                )}
+                {t('withdrawModal.submit')}
+              </button>
+            )}
           </div>
         </form>
       </div>

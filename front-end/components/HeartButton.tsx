@@ -17,6 +17,7 @@
 import { useState } from 'react'
 import { Heart } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useAuth } from '@/lib/auth-context'
 import { useFavorites } from '@/lib/favorites-context'
 
@@ -31,6 +32,7 @@ export default function HeartButton({ workerId, size = 'md', variant = 'card' }:
   const { isFavorite, toggle } = useFavorites()
   const router = useRouter()
   const pathname = usePathname()
+  const t = useTranslations('heartButton')
   const [busy, setBusy] = useState(false)
 
   const fav = isFavorite(workerId)
@@ -65,7 +67,7 @@ export default function HeartButton({ workerId, size = 'md', variant = 'card' }:
       type="button"
       onClick={onClick}
       disabled={busy}
-      aria-label={fav ? 'إزالة من المفضلة' : 'أضف إلى المفضلة'}
+      aria-label={fav ? t('removeAria') : t('addAria')}
       className={`${dims} ${baseClass} rounded-full flex items-center justify-center transition-all disabled:opacity-50`}
     >
       <Heart

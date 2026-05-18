@@ -22,6 +22,21 @@ import { getSocket, disconnectSocket } from './socket'
 import { api } from './api'
 import type { ChatConversation, ChatMessage } from './types'
 
+// ─── AI streaming types ────────────────────────────────────────
+// Events emitted by the backend AI pipeline (see chat.socket.js).
+// "ai:stream:start"  → first token is on its way; show a placeholder bubble
+// "ai:stream"        → append `chunk` to the streaming text
+// "ai:stream:end"    → done; clear the buffer (the canonical chat:message
+//                       for this reply has already been broadcast)
+// "ai:error"         → rate limit / upstream / not configured. UI shows a toast.
+export interface AiErrorEvent {
+  conversationId: string
+  code: 'rate_limited' | 'upstream' | 'not_configured'
+  message: string
+  scope?: 'hour' | 'day'
+  retryAfterSec?: number
+}
+
 // ─── Context shape ─────────────────────────────────────────────
 interface ChatContextValue {
   // Connection state (useful for showing "reconnecting..." banners later)
@@ -53,6 +68,16 @@ interface ChatContextValue {
   onMessage: (handler: (msg: ChatMessage) => void) => () => void
   onTyping: (handler: (data: { conversationId: string, userId: string, isTyping: boolean }) => void) => () => void
   onRead: (handler: (data: { conversationId: string, readerId: string }) => void) => () => void
+
+  // AI streaming — per-conversation accumulating text the UI renders as
+  // a "typing" bubble until the canonical chat:message replaces it.
+  getAiStreamingText: (conversationId: string) => string
+  // Returns a key that changes whenever ANY AI stream advances. Subscribed
+  // components useEffect on it to re-render without us having to put the
+  // whole streaming map in React state (which would churn the entire tree
+  // on every token).
+  aiStreamTick: number
+  onAiError: (handler: (e: AiErrorEvent) => void) => () => void
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null)
@@ -71,6 +96,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const messageHandlersRef = useRef<Set<(m: ChatMessage) => void>>(new Set())
   const typingHandlersRef = useRef<Set<(d: any) => void>>(new Set())
   const readHandlersRef = useRef<Set<(d: any) => void>>(new Set())
+  const aiErrorHandlersRef = useRef<Set<(e: AiErrorEvent) => void>>(new Set())
+  // Per-conversation accumulating text from ai:stream chunks. Stored as a
+  // ref (not state) because every token would otherwise re-render every
+  // consumer of useChat() — we use `aiStreamTick` below as a lightweight
+  // signal for thread views to re-read the buffer.
+  const aiStreamingRef = useRef<Map<string, string>>(new Map())
+  const [aiStreamTick, setAiStreamTick] = useState(0)
   const socketRef = useRef<Socket | null>(null)
 
   // ─── Seed + connect when logged in ──────────────────────────
@@ -172,6 +204,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setNotifications(prev => [notif, ...prev])
     }
 
+    // ─── AI streaming events ──────────────────────────────────
+    // start  → seed an empty buffer so the open thread can render a
+    //          "typing" bubble even before the first token lands.
+    // chunk  → append + bump the tick so subscribers re-read the buffer.
+    // end    → wipe the buffer. The canonical chat:message has already
+    //          been broadcast and inserted via onMessage, so removing the
+    //          streaming entry hands rendering back to the regular flow.
+    // error  → fan out to subscribed thread components (toast UI).
+    const onAiStreamStart = ({ conversationId }: { conversationId: string }) => {
+      aiStreamingRef.current.set(conversationId, '')
+      setAiStreamTick(t => t + 1)
+    }
+    const onAiStream = ({ conversationId, chunk }: { conversationId: string, chunk: string }) => {
+      const prev = aiStreamingRef.current.get(conversationId) || ''
+      aiStreamingRef.current.set(conversationId, prev + chunk)
+      setAiStreamTick(t => t + 1)
+    }
+    const onAiStreamEnd = ({ conversationId }: { conversationId: string }) => {
+      aiStreamingRef.current.delete(conversationId)
+      setAiStreamTick(t => t + 1)
+    }
+    const onAiError = (e: AiErrorEvent) => {
+      // Always clear the streaming buffer so the UI doesn't leave a stale
+      // "typing..." bubble after a failed call.
+      aiStreamingRef.current.delete(e.conversationId)
+      setAiStreamTick(t => t + 1)
+      aiErrorHandlersRef.current.forEach(h => h(e))
+    }
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('presence:snapshot', onPresenceSnapshot)
@@ -180,6 +241,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     socket.on('chat:read', onRead)
     socket.on('chat:typing', onTyping)
     socket.on('notification:new', onNotificationNew)
+    socket.on('ai:stream:start', onAiStreamStart)
+    socket.on('ai:stream', onAiStream)
+    socket.on('ai:stream:end', onAiStreamEnd)
+    socket.on('ai:error', onAiError)
 
     // If the socket was already connected (singleton reuse), set connected:true immediately.
     if (socket.connected) setConnected(true)
@@ -193,6 +258,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       socket.off('chat:read', onRead)
       socket.off('chat:typing', onTyping)
       socket.off('notification:new', onNotificationNew)
+      socket.off('ai:stream:start', onAiStreamStart)
+      socket.off('ai:stream', onAiStream)
+      socket.off('ai:stream:end', onAiStreamEnd)
+      socket.off('ai:error', onAiError)
     }
   }, [isLoggedIn, user?.id])
 
@@ -286,6 +355,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return () => { readHandlersRef.current.delete(handler) }
   }, [])
 
+  // AI streaming accessors. getAiStreamingText reads the ref-backed buffer
+  // directly — consumers should also depend on `aiStreamTick` so React
+  // re-renders them as tokens arrive.
+  const getAiStreamingText = useCallback((conversationId: string) => {
+    return aiStreamingRef.current.get(conversationId) || ''
+  }, [])
+  const onAiError = useCallback((handler: (e: AiErrorEvent) => void) => {
+    aiErrorHandlersRef.current.add(handler)
+    return () => { aiErrorHandlersRef.current.delete(handler) }
+  }, [])
+
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
   const unreadNotificationCount = notifications.filter(n => !n.isRead).length
 
@@ -306,6 +386,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       onMessage,
       onTyping,
       onRead,
+      getAiStreamingText,
+      aiStreamTick,
+      onAiError,
     }}>
       {children}
     </ChatContext.Provider>

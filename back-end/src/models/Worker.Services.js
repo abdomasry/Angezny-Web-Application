@@ -20,7 +20,7 @@ const workerServicesSchema = new mongoose.Schema(
     price: Number,
     typeofService: {
       type: String,
-      enum: ["hourly", "fixed", "range"],
+      enum: ["hourly", "fixed", "range", "custom"],
       default: "fixed",
     },
     time: Date,
@@ -29,6 +29,12 @@ const workerServicesSchema = new mongoose.Schema(
       max: { type: Number },
       custom: { type: String },
     },
+    paymentTiming: {
+      type: String,
+      enum: ["before", "after"],
+      default: "before",
+    },
+    isPrivate: { type: Boolean, default: false },
     active: { type: Boolean, default: false },
     approvalStatus: {
       type: String,

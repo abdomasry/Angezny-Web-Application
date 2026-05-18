@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Bot, Sparkles, Pin } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/lib/auth-context'
 import { useChat } from '@/lib/chat-context'
@@ -67,19 +67,28 @@ export default function MessagesInboxPage() {
           ) : (
             <ul className="divide-y divide-outline-variant/10">
               {conversations.map(conv => {
-                const isOnline = conv.otherUser && onlineUserIds.has(String(conv.otherUser._id))
-                const name = conv.otherUser
-                  ? `${conv.otherUser.firstName} ${conv.otherUser.lastName}`
-                  : 'مستخدم محذوف'
+                const isAi = conv.type === 'ai'
+                const isOnline = !isAi && conv.otherUser && onlineUserIds.has(String(conv.otherUser._id))
+                const name = isAi
+                  ? 'المساعد الذكي'
+                  : conv.otherUser
+                    ? `${conv.otherUser.firstName} ${conv.otherUser.lastName}`
+                    : 'مستخدم محذوف'
                 return (
                   <li key={conv._id}>
                     <Link
                       href={`/messages/${conv._id}`}
-                      className="flex items-center gap-4 p-4 hover:bg-surface-container-low/50 transition-colors"
+                      className={`flex items-center gap-4 p-4 hover:bg-surface-container-low/50 transition-colors ${isAi ? 'bg-primary/5' : ''}`}
                     >
-                      {/* Avatar with online dot */}
+                      {/* Avatar — robot icon for AI, photo/initial for humans.
+                          AI row also skips the online/offline dot since the
+                          assistant is always "online". */}
                       <div className="relative shrink-0">
-                        {conv.otherUser?.profileImage ? (
+                        {isAi ? (
+                          <div className="w-12 h-12 rounded-full bg-linear-to-br from-primary to-blue-500 text-white flex items-center justify-center shadow-sm">
+                            <Bot className="w-6 h-6" />
+                          </div>
+                        ) : conv.otherUser?.profileImage ? (
                           <img
                             src={conv.otherUser.profileImage}
                             alt=""
@@ -90,26 +99,40 @@ export default function MessagesInboxPage() {
                             {conv.otherUser?.firstName?.charAt(0) || '?'}
                           </div>
                         )}
-                        <span className={`absolute bottom-0 end-0 w-3 h-3 rounded-full border-2 border-surface-container-lowest ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        {!isAi && (
+                          <span className={`absolute bottom-0 end-0 w-3 h-3 rounded-full border-2 border-surface-container-lowest ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        )}
                       </div>
 
-                      {/* Name + snippet (right-aligned, RTL) */}
+                      {/* Name + snippet (right-aligned, RTL).
+                          AI rows show a pin icon + "مثبت" instead of a
+                          timestamp to make the always-on-top placement
+                          feel intentional rather than buggy. */}
                       <div className="flex-1 min-w-0 text-right">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className="text-xs text-on-surface-variant shrink-0">
-                            {conv.lastMessageAt ? formatTime(conv.lastMessageAt) : ''}
-                          </span>
-                          <h3 className="font-bold text-on-surface truncate">{name}</h3>
+                          {isAi ? (
+                            <span className="text-[11px] text-primary shrink-0 flex items-center gap-0.5">
+                              <Pin className="w-3 h-3" />
+                              مثبت
+                            </span>
+                          ) : (
+                            <span className="text-xs text-on-surface-variant shrink-0">
+                              {conv.lastMessageAt ? formatTime(conv.lastMessageAt) : ''}
+                            </span>
+                          )}
+                          <h3 className="font-bold text-on-surface truncate flex items-center gap-1.5 justify-end">
+                            {name}
+                            {isAi && <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />}
+                          </h3>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          {/* Unread badge on the LEFT (visually "end" in RTL row) */}
                           {conv.unreadCount > 0 && (
                             <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shrink-0">
                               {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
                             </span>
                           )}
                           <p className={`text-sm truncate ${conv.unreadCount > 0 ? 'text-on-surface font-semibold' : 'text-on-surface-variant'}`}>
-                            {conv.lastMessage || 'ابدأ المحادثة'}
+                            {conv.lastMessage || (isAi ? 'اسألني عن أي شيء يخص المنصة' : 'ابدأ المحادثة')}
                           </p>
                         </div>
                       </div>

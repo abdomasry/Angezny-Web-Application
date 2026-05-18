@@ -13,16 +13,23 @@ export interface User {
 // Mirror what /api/chat/* endpoints and Socket.IO events return.
 
 // Minimal user shape embedded in a conversation row.
+// `ai` is the reserved system role for the chatbot — it's the "otherUser"
+// for any ChatConversation whose `type === 'ai'`.
 export interface ChatParticipant {
   _id: string
   firstName: string
   lastName: string
   profileImage?: string
-  role?: 'customer' | 'worker' | 'admin'
+  role?: 'customer' | 'worker' | 'admin' | 'ai'
 }
 
 export interface ChatConversation {
   _id: string
+  // 'human' = regular customer↔worker DM. 'ai' = chat with the assistant.
+  // Used by the inbox/widget/thread to render the AI conversation
+  // differently (robot avatar, no file upload, streaming "typing" bubble).
+  // Defaults to 'human' for back-compat with rows that pre-date this field.
+  type?: 'human' | 'ai'
   otherUser: ChatParticipant | null
   lastMessage: string
   lastMessageAt: string
@@ -152,7 +159,7 @@ export interface WorkerService {
   description?: string
   images?: string[]
   price: number
-  typeofService: 'hourly' | 'fixed' | 'range'
+  typeofService: 'hourly' | 'fixed' | 'range' | 'custom'
   priceRange?: { min?: number; max?: number; custom?: string }
   active: boolean
   // Sometimes categoryId is a raw id string (worker dashboard), sometimes
@@ -253,6 +260,9 @@ export interface ServiceRequest {
     name: string
   }
   description?: string
+  // Customer-uploaded problem photos, attached at order creation.
+  // Cloudinary secure_urls; 0–5 entries.
+  problemImages?: string[]
   location?: {
     address?: string
   }
@@ -288,11 +298,21 @@ export interface ServiceRequest {
     comment?: string
     createdAt: string
   }
-  status: 'pending' | 'accepted' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'pending' | 'pending_customer_confirmation' | 'accepted' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'
   scheduledDate?: string
   completedAt?: string
   cancelledBy?: string
   createdAt: string
+  // ── Worker-initiated custom-price orders ─────────────────────────────────
+  // When a worker creates an on-site upsell order from a customer's profile,
+  // serviceId is null and these fields carry the order details directly.
+  initiatedBy?: 'customer' | 'worker'
+  customTitle?: string | null
+  customPrice?: number | null
+  paymentTiming?: 'before' | 'after'
+  // Set once a Payment doc is linked to this order (after a successful card
+  // charge). Used in the UI to hide "Pay now" once payment is recorded.
+  payment?: string | null
 }
 
 // Payment method — saved credit/debit card (only last 4 digits stored, never full number)
@@ -360,7 +380,38 @@ export interface WalletTransaction {
     serviceId?: string | { _id: string; name?: string }
     scheduledDate?: string
   } | string
+  // Populated when source === 'withdrawal' — snapshot of how/where the money
+  // was sent at the time of the withdrawal. Survives later changes to the
+  // worker's saved payoutInfo.
+  payoutMethod?: 'bank' | 'instapay' | 'wallet'
+  paymobPayoutId?: string
+  failureReason?: string
   createdAt: string
+}
+
+// Worker payout destination (set via /api/worker/payouts/info).
+// Only the fields relevant to `method` are meaningful — the others may be
+// empty strings on the wire.
+export interface WorkerPayoutInfo {
+  method: 'bank' | 'instapay' | 'wallet'
+  bankAccountNumber?: string
+  bankName?: string
+  accountHolderName?: string
+  instapayAlias?: string
+  walletPhone?: string
+  updatedAt?: string
+}
+
+// Pay-in attempt the customer kicked off from /checkout (one per attempt).
+// Polled by /checkout/result to surface success / failure to the customer.
+export interface PaymentStatus {
+  _id: string
+  status: 'pending' | 'completed' | 'failed' | 'refunded'
+  amount: number
+  paymentMethod?: 'card' | 'wallet' | 'instapay'
+  failureReason?: string
+  paidAt?: string
+  serviceRequestId?: string
 }
 
 // Service request from worker's perspective — customerId is populated (not workerId)
@@ -398,7 +449,7 @@ export interface WorkerServiceRequest {
     respondedAt?: string
     denialReason?: string
   }
-  status: 'pending' | 'accepted' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'pending' | 'pending_customer_confirmation' | 'accepted' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'
   scheduledDate?: string
   completedAt?: string
   createdAt: string
@@ -407,6 +458,12 @@ export interface WorkerServiceRequest {
   // locked across reloads, even if the in-memory `reviewedOrderIds` set is
   // empty after a navigation.
   hasWorkerReview?: boolean
+  // Worker-initiated / quoted-custom order fields.
+  initiatedBy?: 'customer' | 'worker'
+  customTitle?: string | null
+  customPrice?: number | null
+  paymentTiming?: 'before' | 'after'
+  problemImages?: string[]
 }
 
 // Admin dashboard stats — platform-wide counts

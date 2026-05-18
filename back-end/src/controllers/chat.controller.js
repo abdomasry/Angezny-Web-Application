@@ -7,13 +7,46 @@ const WorkerServices = require("../models/Worker.Services");
 // ============================================================
 // Chat REST endpoints
 
+// Helper: make sure the user has an "ai" conversation with the system AI
+// user. Lazy-created the first time they open the inbox so we don't write
+// any DB rows for users who never engage. Idempotent — re-running it on
+// every list call is fine (it just does a single findOne when the conv
+// exists). Returns the doc, or null if the AI user isn't configured.
+async function ensureAiConversation(userId) {
+  const aiId = global.AI_USER_ID;
+  if (!aiId) return null;
+
+  let conv = await Conversation.findOne({
+    type: "ai",
+    participants: { $all: [userId, aiId], $size: 2 },
+  });
+  if (conv) return conv;
+
+  conv = await Conversation.create({
+    type: "ai",
+    participants: [userId, aiId],
+    lastMessage: "اسألني عن أي شيء يخص خدمات المنصة • Ask me anything about platform services",
+    lastMessageAt: new Date(),
+    unreadCounts: {},
+  });
+  return conv;
+}
+
 // GET /api/chat/conversations
 // List the current user's conversations, newest-first. Each row has
 // the other participant's public info + lastMessage + unreadCount.
 // Used by the /messages inbox page and the ChatWidget collapsed view.
+//
+// AI integration: before listing, we ensure the user has their dedicated
+// "ai" conversation (lazy-create). We then sort it pinned-first so the
+// assistant is always the top row regardless of last-activity time.
 const listConversations = async (req, res) => {
   try {
     const userId = req.user._id;
+
+    // Lazy-create the AI conversation if missing. Swallow errors here so
+    // a Groq/seed misconfiguration never breaks the regular inbox.
+    try { await ensureAiConversation(userId); } catch (e) { console.error("ensureAiConversation:", e.message); }
 
     const conversations = await Conversation.find({ participants: userId })
       .sort({ lastMessageAt: -1, updatedAt: -1 })
@@ -26,11 +59,20 @@ const listConversations = async (req, res) => {
       const unreadCount = (conv.unreadCounts && conv.unreadCounts[String(userId)]) || 0;
       return {
         _id: conv._id,
+        type: conv.type || "human",
         otherUser: other || null,
         lastMessage: conv.lastMessage || "",
         lastMessageAt: conv.lastMessageAt || conv.updatedAt,
         unreadCount,
       };
+    });
+
+    // Pin AI conversation(s) to the top. There's only ever one per user,
+    // but the .sort callback handles "what if zero or many" cleanly.
+    rows.sort((a, b) => {
+      if (a.type === "ai" && b.type !== "ai") return -1;
+      if (b.type === "ai" && a.type !== "ai") return 1;
+      return 0;
     });
 
     res.json({ conversations: rows });

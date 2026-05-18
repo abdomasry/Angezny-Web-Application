@@ -19,6 +19,10 @@ const {
   updateOrderStatusByWorker,
   cancelOrderByCustomer,
   respondToCancellationByWorker,
+  createWorkerInitiatedOrder,
+  confirmWorkerOrder,
+  rejectWorkerOrder,
+  getCustomerForWorker,
 } = require("../controllers/order.controller");
 const authMiddleware = require("../middleware/auth.middleware");
 const workerOnly = require("../middleware/worker.middleware");
@@ -26,10 +30,22 @@ const workerOnly = require("../middleware/worker.middleware");
 // Mounted at /api. Full paths:
 //   POST /api/customer/orders
 //   POST /api/customer/orders/:id/cancel
+//   PUT  /api/customer/orders/:id/confirm
+//   PUT  /api/customer/orders/:id/reject
+//   POST /api/worker/orders                      (worker-initiated custom-price order)
 //   PUT  /api/worker/orders/:id/status
 //   PUT  /api/worker/orders/:id/cancellation
+//   GET  /api/worker/customers/:id               (customer profile + history)
 router.post("/customer/orders", authMiddleware, createOrder);
 router.post("/customer/orders/:id/cancel", authMiddleware, cancelOrderByCustomer);
+router.put("/customer/orders/:id/confirm", authMiddleware, confirmWorkerOrder);
+router.put("/customer/orders/:id/reject", authMiddleware, rejectWorkerOrder);
+router.post(
+  "/worker/orders",
+  authMiddleware,
+  workerOnly,
+  createWorkerInitiatedOrder,
+);
 router.put(
   "/worker/orders/:id/status",
   authMiddleware,
@@ -41,6 +57,12 @@ router.put(
   authMiddleware,
   workerOnly,
   respondToCancellationByWorker,
+);
+router.get(
+  "/worker/customers/:id",
+  authMiddleware,
+  workerOnly,
+  getCustomerForWorker,
 );
 
 module.exports = router;

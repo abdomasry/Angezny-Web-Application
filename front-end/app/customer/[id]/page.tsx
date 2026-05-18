@@ -6,11 +6,153 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
-import { Star, Calendar, ChevronLeft, ChevronRight, MessageSquare, ShieldOff, ShoppingBag, CheckCircle } from 'lucide-react'
+import { Star, Calendar, ChevronLeft, ChevronRight, MessageSquare, ShieldOff, ShoppingBag, CheckCircle, Plus, X } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import type { CustomerPublicProfile, CustomerReview, PaginationInfo } from '@/lib/types'
+
+// ── AddOrderForCustomer modal ─────────────────────────────────────────────
+// Worker-only inline form for creating a one-off custom-priced order against
+// the customer whose profile is being viewed. Hits POST /api/worker/orders.
+// Server validates that this worker has a prior order with this customer.
+function AddOrderForCustomer({
+  customerId,
+  customerName,
+  onClose,
+}: {
+  customerId: string
+  customerName: string
+  onClose: (created: boolean) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [price, setPrice] = useState('')
+  const [paymentTiming, setPaymentTiming] = useState<'before' | 'after'>('before')
+  const [paymentMode, setPaymentMode] = useState<'cash_on_delivery' | 'card'>('cash_on_delivery')
+  const [address, setAddress] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const priceNum = Number(price)
+    if (!title.trim()) return setError('يرجى إدخال وصف الطلب')
+    if (!Number.isFinite(priceNum) || priceNum <= 0) return setError('يرجى إدخال سعر صحيح')
+
+    setSubmitting(true)
+    try {
+      await api.postWithAuth('/worker/orders', {
+        customerId,
+        customTitle: title.trim(),
+        customPrice: priceNum,
+        paymentTiming,
+        paymentMode,
+        location: address.trim() ? { address: address.trim() } : undefined,
+      })
+      onClose(true)
+    } catch (err: any) {
+      setError(err?.message || 'تعذر إنشاء الطلب')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !submitting && onClose(false)}>
+      <div className="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="text-xl font-bold">إضافة طلب لـ {customerName}</h3>
+            <p className="text-sm text-on-surface-variant mt-1">العميل سيصله إشعار للمراجعة، ثم يؤكد ويدفع حسب التوقيت الذي تختاره.</p>
+          </div>
+          <button type="button" onClick={() => !submitting && onClose(false)} className="text-on-surface-variant hover:text-on-surface">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">وصف الطلب</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              placeholder="مثلاً: استبدال القاطع الكهربائي"
+              className="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">السعر (جنيه)</label>
+            <input
+              type="number"
+              min="1"
+              step="any"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">توقيت الدفع</label>
+            <div className="flex gap-3">
+              {(['before', 'after'] as const).map((opt) => (
+                <label key={opt} className={`flex-1 px-3 py-2 rounded-lg border text-center cursor-pointer ${paymentTiming === opt ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/30'}`}>
+                  <input type="radio" name="paymentTiming" value={opt} checked={paymentTiming === opt} onChange={() => setPaymentTiming(opt)} className="sr-only" />
+                  {opt === 'before' ? 'قبل الخدمة' : 'بعد الخدمة'}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
+              {paymentTiming === 'before'
+                ? 'قبل الخدمة: العميل يدفع قبل بدء العمل.'
+                : 'بعد الخدمة: العميل يؤكد الآن ويدفع بعد إنهاء الخدمة.'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">طريقة الدفع</label>
+            <div className="flex gap-3">
+              {(['cash_on_delivery', 'card'] as const).map((opt) => (
+                <label key={opt} className={`flex-1 px-3 py-2 rounded-lg border text-center cursor-pointer ${paymentMode === opt ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant/30'}`}>
+                  <input type="radio" name="paymentMode" value={opt} checked={paymentMode === opt} onChange={() => setPaymentMode(opt)} className="sr-only" />
+                  {opt === 'cash_on_delivery' ? 'كاش' : 'بطاقة'}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">العنوان (اختياري)</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              maxLength={300}
+              className="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest"
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => !submitting && onClose(false)} disabled={submitting} className="flex-1 px-4 py-2 rounded-lg border border-outline-variant/30">
+              إلغاء
+            </button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 rounded-lg bg-primary text-white disabled:opacity-50">
+              {submitting ? '...جارٍ الإرسال' : 'إنشاء الطلب'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 function StarRating({ rating, size = 'w-5 h-5' }: { rating: number; size?: string }) {
   const filled = Math.round(rating)
@@ -37,6 +179,8 @@ export default function CustomerProfilePage() {
   const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 6, total: 0, pages: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [addOrderOpen, setAddOrderOpen] = useState(false)
+  const [createdToast, setCreatedToast] = useState(false)
 
   // Auth gate redirect
   useEffect(() => {
@@ -129,6 +273,26 @@ export default function CustomerProfilePage() {
     <div className="bg-background min-h-screen">
       <Navbar />
 
+      {addOrderOpen && customer && (
+        <AddOrderForCustomer
+          customerId={String(params.id)}
+          customerName={`${customer.firstName} ${customer.lastName}`.trim()}
+          onClose={(created) => {
+            setAddOrderOpen(false)
+            if (created) {
+              setCreatedToast(true)
+              setTimeout(() => setCreatedToast(false), 4000)
+            }
+          }}
+        />
+      )}
+
+      {createdToast && (
+        <div className="fixed top-24 right-6 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg">
+          تم إرسال الطلب — في انتظار تأكيد العميل
+        </div>
+      )}
+
       <section className="bg-primary text-white pt-24 pb-32">
         <div className="max-w-5xl mx-auto px-6">
           <div className="flex flex-col md:flex-row-reverse items-center gap-8">
@@ -146,7 +310,19 @@ export default function CustomerProfilePage() {
               )}
             </div>
             <div className="text-center md:text-right flex-1">
-              <h1 className="text-4xl font-bold mb-2">{customer.firstName} {customer.lastName}</h1>
+              <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2 md:justify-end">
+                <h1 className="text-4xl font-bold">{customer.firstName} {customer.lastName}</h1>
+                {user?.role === 'worker' && (
+                  <button
+                    type="button"
+                    onClick={() => setAddOrderOpen(true)}
+                    className="inline-flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-lg font-semibold shadow hover:bg-white/90 self-center md:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    إضافة طلب لهذا العميل
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap justify-center md:justify-start gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />

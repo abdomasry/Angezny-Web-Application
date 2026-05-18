@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 import { AlertTriangle, Loader2, X as XIcon, Send, AlertCircle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { api } from '@/lib/api'
 
 interface Props {
@@ -32,6 +33,7 @@ export default function CancelOrderModal({
   onClose,
   onDone,
 }: Props) {
+  const t = useTranslations('cancelOrderModal')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -48,7 +50,7 @@ export default function CancelOrderModal({
       })
       onDone(data?.mode === 'direct' ? 'direct' : 'request')
     } catch (err: any) {
-      setError(err?.message || 'تعذّر إلغاء الطلب')
+      setError(err?.message || t('failed'))
     } finally {
       setSubmitting(false)
     }
@@ -68,7 +70,7 @@ export default function CancelOrderModal({
             </div>
             <div>
               <h2 className="text-xl font-black text-on-surface">
-                {isDirect ? 'إلغاء الطلب' : 'طلب إلغاء الخدمة'}
+                {isDirect ? t('directTitle') : t('requestTitle')}
               </h2>
               {serviceName && (
                 <p className="text-sm text-on-surface-variant mt-0.5">{serviceName}</p>
@@ -92,28 +94,23 @@ export default function CancelOrderModal({
             isDirect ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'
           }`}>
             {isDirect ? (
-              <p>
-                الطلب لم يُقبل بعد من الحرفي، لذا سيُلغى فوراً بدون الحاجة لموافقته.
-              </p>
+              <p>{t('directBody')}</p>
             ) : (
-              <p>
-                الحرفي وافق على الطلب بالفعل. سيُرسل طلب الإلغاء للحرفي لمراجعته،
-                وسيتم إلغاء الخدمة فقط بعد موافقته.
-              </p>
+              <p>{t('requestBody')}</p>
             )}
           </div>
 
           {/* Reason (optional) */}
           <div>
             <label className="block text-sm font-bold text-on-surface mb-2">
-              سبب الإلغاء (اختياري)
+              {t('reasonLabel')}
             </label>
             <textarea
               value={reason}
               onChange={e => setReason(e.target.value)}
               rows={3}
               maxLength={500}
-              placeholder="أخبر الحرفي بسبب الإلغاء إن رغبت..."
+              placeholder={t('reasonPlaceholder')}
               className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none"
             />
             <p className="text-xs text-on-surface-variant mt-1 text-left">
@@ -137,7 +134,7 @@ export default function CancelOrderModal({
               disabled={submitting}
               className="px-5 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface font-semibold hover:bg-surface-container-high disabled:opacity-50"
             >
-              تراجع
+              {t('back')}
             </button>
             <button
               type="submit"
@@ -149,17 +146,17 @@ export default function CancelOrderModal({
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  جاري الإرسال...
+                  {t('sending')}
                 </>
               ) : isDirect ? (
                 <>
                   <XIcon className="w-4 h-4" />
-                  تأكيد الإلغاء
+                  {t('confirmCancel')}
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  إرسال طلب الإلغاء
+                  {t('sendRequest')}
                 </>
               )}
             </button>

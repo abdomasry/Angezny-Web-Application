@@ -11,6 +11,34 @@ const WorkerProfile = require("../models/Worker.Profile");
 const WalletTransaction = require("../models/Wallet.Transaction");
 const { validateCouponInternal } = require("./coupon.controller");
 const { computeRank } = require("../lib/rank");
+const { reverseGeocode } = require("../utils/geocode");
+
+// Fire-and-forget: when an order was saved with lat/lng but the client
+// didn't supply a governorate (the picker's reverse-geocode failed, or the
+// customer skipped it), ask Nominatim ourselves and patch the doc.
+// Runs after the response is sent so order creation latency is unaffected.
+function backfillOrderGeoAsync(orderId, lat, lng, hasGovernorate, hasCity) {
+  if (hasGovernorate && hasCity) return;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  setImmediate(async () => {
+    try {
+      const geo = await reverseGeocode(lat, lng);
+      if (!geo) return;
+      const update = {};
+      if (!hasGovernorate && geo.governorate) {
+        update["location.governorate"] = geo.governorate;
+      }
+      if (!hasCity && geo.city) {
+        update["location.city"] = geo.city;
+      }
+      if (Object.keys(update).length) {
+        await ServiceRequest.updateOne({ _id: orderId }, { $set: update });
+      }
+    } catch (err) {
+      console.error("backfillOrderGeoAsync failed:", err);
+    }
+  });
+}
 
 // Helper: emit notification:new over Socket.IO to a specific user's room.
 const emitNotification = (req, userId, notification) => {
@@ -50,9 +78,12 @@ const createOrder = async (req, res) => {
       address,
       lat,
       lng,
+      governorate,
+      city,
       notes,
       paymentMode = "cash_on_delivery",
       couponCode,
+      problemImages,
     } = req.body || {};
 
     if (!serviceId) {
@@ -76,12 +107,10 @@ const createOrder = async (req, res) => {
         pickedLng = lngNum;
       }
     }
-    if (paymentMode === "card") {
-      return res.status(400).json({
-        message: "الدفع بالبطاقة غير متاح حالياً، يرجى اختيار الدفع عند الاستلام",
-      });
-    }
-    if (!["cash_on_delivery"].includes(paymentMode)) {
+    // Card payments now go through Paymob's hosted checkout. The order is
+    // created in `pending` status (same as COD), but the worker is NOT
+    // notified yet — that happens after the Paymob webhook confirms payment.
+    if (!["cash_on_delivery", "card"].includes(paymentMode)) {
       return res.status(400).json({ message: "طريقة دفع غير صالحة" });
     }
 
@@ -93,8 +122,16 @@ const createOrder = async (req, res) => {
     if (!service) {
       return res.status(404).json({ message: "الخدمة غير موجودة" });
     }
-    if (!service.active || service.approvalStatus !== "approved") {
+    if (!service.active || service.approvalStatus !== "approved" || service.isPrivate) {
       return res.status(400).json({ message: "الخدمة غير متاحة حالياً" });
+    }
+    // Custom-priced services are "ask only" — the customer must chat with
+    // the worker, and the worker creates the actual order from the
+    // customer's profile. Block any direct order attempt at the API layer.
+    if (service.typeofService === "custom") {
+      return res.status(400).json({
+        message: "هذه الخدمة بسعر مخصص — تواصل مع الحرفي عبر الدردشة",
+      });
     }
     if (!service.workerID?.userId) {
       return res.status(500).json({ message: "تعذر العثور على بيانات مقدم الخدمة" });
@@ -131,12 +168,22 @@ const createOrder = async (req, res) => {
 
     const finalPrice = Math.max(0, basePrice - discountAmount);
 
+    // Customer-uploaded problem photos. Optional; cap at 5. Strings only —
+    // client uploads to Cloudinary directly and posts back the secure_urls.
+    const sanitizedProblemImages = Array.isArray(problemImages)
+      ? problemImages
+          .filter((u) => typeof u === "string" && u.trim())
+          .map((u) => u.trim())
+          .slice(0, 5)
+      : [];
+
     const order = await ServiceRequest.create({
       customerId: req.user._id,
       workerId: workerUserId,
       serviceId: service._id,
       categoryId: service.categoryId?._id || service.categoryId,
       description: (notes || "").trim(),
+      problemImages: sanitizedProblemImages,
       location: {
         address: String(address).trim(),
         // Spread the coords only when both are valid — keeps the doc clean
@@ -144,9 +191,21 @@ const createOrder = async (req, res) => {
         ...(pickedLat !== undefined && pickedLng !== undefined
           ? { lat: pickedLat, lng: pickedLng }
           : {}),
+        // Reverse-geocoded from the map pin (frontend normalizes
+        // governorate against the canonical Egyptian list). Both are
+        // optional — when the customer typed an address manually they
+        // stay unset and analytics falls back to "غير محدد".
+        ...(governorate && String(governorate).trim()
+          ? { governorate: String(governorate).trim().slice(0, 60) }
+          : {}),
+        ...(city && String(city).trim()
+          ? { city: String(city).trim().slice(0, 80) }
+          : {}),
       },
       proposedPrice: finalPrice,
       paymentMode,
+      // Inherit the service's default payment timing.
+      paymentTiming: service.paymentTiming || "before",
       couponCode: appliedCouponCode,
       discountAmount,
       scheduledDate: new Date(scheduledDate),
@@ -166,17 +225,22 @@ const createOrder = async (req, res) => {
 
     // Notify the worker. Reuses the 24h TTL Notification model — no new
     // infrastructure.
-    const customerName = `${req.user.firstName} ${req.user.lastName}`.trim();
-    const notification = await Notification.create({
-      userId: workerUserId,
-      title: "طلب خدمة جديد",
-      message: `طلب من ${customerName} لخدمة: ${service.name}`,
-      type: "info",
-      link: "/dashboard",
-    });
+    // Card orders are silent here on purpose: the worker is pinged from the
+    // payment webhook AFTER Paymob confirms the money cleared. COD orders
+    // notify immediately as before.
+    if (paymentMode === "cash_on_delivery") {
+      const customerName = `${req.user.firstName} ${req.user.lastName}`.trim();
+      const notification = await Notification.create({
+        userId: workerUserId,
+        title: "طلب خدمة جديد",
+        message: `طلب من ${customerName} لخدمة: ${service.name}`,
+        type: "info",
+        link: "/dashboard",
+      });
 
-    // Fire-and-forget socket emit so the worker's bell updates live.
-    emitNotification(req, workerUserId, notification);
+      // Fire-and-forget socket emit so the worker's bell updates live.
+      emitNotification(req, workerUserId, notification);
+    }
 
     // Return the fully populated order so the frontend can immediately
     // render it without a second fetch.
@@ -187,6 +251,17 @@ const createOrder = async (req, res) => {
       .populate("serviceId", "name images price typeofService priceRange");
 
     res.status(201).json({ order: populated });
+
+    // Background fallback: if the client sent coords but no governorate
+    // (or no city), have the server reverse-geocode and patch the doc.
+    // Runs AFTER the response so order-creation latency is unaffected.
+    backfillOrderGeoAsync(
+      order._id,
+      pickedLat,
+      pickedLng,
+      Boolean(governorate && String(governorate).trim()),
+      Boolean(city && String(city).trim()),
+    );
   } catch (err) {
     console.error("createOrder error:", err);
     res.status(500).json({ message: "خطأ في إنشاء الطلب" });
@@ -515,9 +590,297 @@ const respondToCancellationByWorker = async (req, res) => {
   }
 };
 
+// ============================================================
+// POST /api/worker/orders
+// ============================================================
+// Worker creates a one-off, custom-priced order targeted at a specific
+// customer (e.g. an on-site upsell discovered during a regular service call).
+//
+// Body: { customerId, customTitle, customPrice, paymentTiming, paymentMode, location?: { address, lat?, lng? } }
+//
+// Rules:
+//   - Worker can only create this for a customer they've already had at least
+//     one ServiceRequest with — prevents spamming arbitrary users with charges.
+//   - No serviceId is attached. The order carries customTitle + customPrice
+//     directly.
+//   - Status starts at `pending_customer_confirmation`. Customer must confirm
+//     (and pay, if before+card) before it becomes a real `accepted` order.
+//   - No admin verification — per product requirements.
+// ============================================================
+const createWorkerInitiatedOrder = async (req, res) => {
+  try {
+    const {
+      customerId,
+      customTitle,
+      customPrice,
+      paymentTiming = "before",
+      paymentMode = "cash_on_delivery",
+      location,
+    } = req.body || {};
+
+    if (!customerId) {
+      return res.status(400).json({ message: "يرجى تحديد العميل" });
+    }
+    if (!customTitle || !String(customTitle).trim()) {
+      return res.status(400).json({ message: "يرجى إدخال وصف الطلب" });
+    }
+    const priceNum = Number(customPrice);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      return res.status(400).json({ message: "يرجى إدخال سعر صحيح" });
+    }
+    if (!["before", "after"].includes(paymentTiming)) {
+      return res.status(400).json({ message: "توقيت الدفع غير صالح" });
+    }
+    if (!["cash_on_delivery", "card"].includes(paymentMode)) {
+      return res.status(400).json({ message: "طريقة دفع غير صالحة" });
+    }
+    if (String(customerId) === String(req.user._id)) {
+      return res.status(400).json({ message: "لا يمكنك إنشاء طلب لنفسك" });
+    }
+
+    // Trust gate: there must already be a prior order between this worker
+    // and customer (any status). This is the cheap proxy for "they know
+    // each other" — keeps random workers from being able to send arbitrary
+    // payment requests to arbitrary users.
+    const prior = await ServiceRequest.findOne({
+      workerId: req.user._id,
+      customerId,
+    }).select("_id");
+    if (!prior) {
+      return res.status(403).json({
+        message: "لا يمكنك إنشاء طلب لعميل لم تتعامل معه من قبل",
+      });
+    }
+
+    // Optional location coords — same validation as the customer path.
+    const loc = { address: String(location?.address || "").trim() };
+    if (location?.lat !== undefined && location?.lng !== undefined) {
+      const latNum = parseFloat(location.lat);
+      const lngNum = parseFloat(location.lng);
+      if (
+        Number.isFinite(latNum) && Number.isFinite(lngNum) &&
+        latNum >= -90 && latNum <= 90 &&
+        lngNum >= -180 && lngNum <= 180
+      ) {
+        loc.lat = latNum;
+        loc.lng = lngNum;
+      }
+    }
+    // Carry the picker's reverse-geocoded fields through so admin geo
+    // analytics can group these worker-initiated orders too.
+    if (location?.governorate && String(location.governorate).trim()) {
+      loc.governorate = String(location.governorate).trim().slice(0, 60);
+    }
+    if (location?.city && String(location.city).trim()) {
+      loc.city = String(location.city).trim().slice(0, 80);
+    }
+
+    const order = await ServiceRequest.create({
+      customerId,
+      workerId: req.user._id,
+      initiatedBy: "worker",
+      customTitle: String(customTitle).trim().slice(0, 200),
+      customPrice: priceNum,
+      proposedPrice: priceNum,
+      paymentTiming,
+      paymentMode,
+      location: loc,
+      status: "pending_customer_confirmation",
+    });
+
+    // Notify the customer — they need to act on this from their Pending
+    // Confirmation tab.
+    const workerName = `${req.user.firstName} ${req.user.lastName}`.trim();
+    const notification = await Notification.create({
+      userId: customerId,
+      title: "طلب جديد بانتظار تأكيدك",
+      message: `أنشأ ${workerName} طلباً لك: ${order.customTitle} (${priceNum} جنيه)`,
+      type: "info",
+      link: "/profile",
+    });
+    emitNotification(req, customerId, notification);
+
+    const populated = await ServiceRequest.findById(order._id)
+      .populate("workerId", "firstName lastName profileImage")
+      .populate("customerId", "firstName lastName profileImage");
+
+    res.status(201).json({ order: populated });
+
+    // Same fallback as the customer path — handles workers who type a
+    // free-form address with coords but no governorate.
+    backfillOrderGeoAsync(
+      order._id,
+      loc.lat,
+      loc.lng,
+      Boolean(loc.governorate),
+      Boolean(loc.city),
+    );
+  } catch (err) {
+    console.error("createWorkerInitiatedOrder error:", err);
+    res.status(500).json({ message: "خطأ في إنشاء الطلب" });
+  }
+};
+
+// ============================================================
+// PUT /api/customer/orders/:id/confirm
+// ============================================================
+// Customer accepts a worker-initiated order. Behavior depends on payment
+// timing + mode:
+//   - before + card  → return Paymob checkout URL; status stays
+//     `pending_customer_confirmation` until webhook flips it to `accepted`.
+//   - before + cash  → status flips to `accepted` immediately.
+//   - after  (any)   → status flips to `accepted` immediately; payment
+//     happens at completion (existing flow handles cash; card uses the
+//     standard /payments/checkout endpoint after completion).
+// ============================================================
+const confirmWorkerOrder = async (req, res) => {
+  try {
+    const order = await ServiceRequest.findById(req.params.id)
+      .populate("workerId", "firstName lastName");
+    if (!order) return res.status(404).json({ message: "الطلب غير موجود" });
+
+    if (String(order.customerId) !== String(req.user._id)) {
+      return res.status(403).json({ message: "غير مصرح" });
+    }
+    if (order.initiatedBy !== "worker") {
+      return res.status(400).json({ message: "هذا الطلب لا يحتاج إلى تأكيد" });
+    }
+    if (order.status !== "pending_customer_confirmation") {
+      return res.status(400).json({ message: "تم التعامل مع هذا الطلب بالفعل" });
+    }
+
+    const needsUpfrontCardPayment =
+      order.paymentTiming === "before" && order.paymentMode === "card";
+
+    if (needsUpfrontCardPayment) {
+      // Don't change status yet. The customer hasn't actually paid — they
+      // need to be redirected through the /payments/checkout flow first.
+      // Once the Paymob webhook lands, the webhook handler flips this order
+      // to `accepted` and notifies the worker.
+      return res.json({
+        order,
+        requiresPayment: true,
+        message: "يرجى إتمام الدفع لتأكيد الطلب",
+      });
+    }
+
+    // No upfront card payment required — accept immediately.
+    order.status = "accepted";
+    await order.save();
+
+    const workerName = order.workerId
+      ? `${order.workerId.firstName} ${order.workerId.lastName}`.trim()
+      : "العميل";
+    const notif = await Notification.create({
+      userId: order.workerId._id || order.workerId,
+      title: "تم قبول طلبك",
+      message: `وافق العميل على الطلب: ${order.customTitle || "خدمة"}`,
+      type: "success",
+      link: "/dashboard",
+    });
+    emitNotification(req, order.workerId._id || order.workerId, notif);
+
+    res.json({ order, requiresPayment: false });
+  } catch (err) {
+    console.error("confirmWorkerOrder error:", err);
+    res.status(500).json({ message: "خطأ في تأكيد الطلب" });
+  }
+};
+
+// ============================================================
+// PUT /api/customer/orders/:id/reject
+// ============================================================
+// Customer declines a worker-initiated order. Terminal state: cancelled.
+// ============================================================
+const rejectWorkerOrder = async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const order = await ServiceRequest.findById(req.params.id)
+      .populate("workerId", "firstName lastName");
+    if (!order) return res.status(404).json({ message: "الطلب غير موجود" });
+
+    if (String(order.customerId) !== String(req.user._id)) {
+      return res.status(403).json({ message: "غير مصرح" });
+    }
+    if (order.initiatedBy !== "worker") {
+      return res.status(400).json({ message: "لا يمكن رفض هذا الطلب من هنا" });
+    }
+    if (order.status !== "pending_customer_confirmation") {
+      return res.status(400).json({ message: "تم التعامل مع هذا الطلب بالفعل" });
+    }
+
+    order.status = "cancelled";
+    order.cancelledBy = "customer";
+    if (reason) order.rejectionReason = String(reason).slice(0, 500);
+    await order.save();
+
+    const notif = await Notification.create({
+      userId: order.workerId._id || order.workerId,
+      title: "رفض العميل طلبك",
+      message: reason
+        ? `رفض العميل: ${order.customTitle || "خدمة"}. السبب: ${reason}`
+        : `رفض العميل: ${order.customTitle || "خدمة"}`,
+      type: "warning",
+      link: "/dashboard",
+    });
+    emitNotification(req, order.workerId._id || order.workerId, notif);
+
+    res.json({ order });
+  } catch (err) {
+    console.error("rejectWorkerOrder error:", err);
+    res.status(500).json({ message: "خطأ في رفض الطلب" });
+  }
+};
+
+// ============================================================
+// GET /api/worker/customers/:id
+// ============================================================
+// Worker-facing customer profile. Returns the customer's public fields plus
+// the history of orders between this worker and that customer (so the
+// worker has context before creating a new on-site order).
+//
+// Authorization mirrors createWorkerInitiatedOrder: worker must have had at
+// least one prior order with this customer.
+// ============================================================
+const getCustomerForWorker = async (req, res) => {
+  try {
+    const User = require("../models/User.Model");
+
+    const customer = await User.findById(req.params.id)
+      .select("firstName lastName email phone profileImage role");
+    if (!customer || customer.role !== "customer") {
+      return res.status(404).json({ message: "العميل غير موجود" });
+    }
+
+    // Same trust gate as the order-create endpoint.
+    const orders = await ServiceRequest.find({
+      workerId: req.user._id,
+      customerId: customer._id,
+    })
+      .sort({ createdAt: -1 })
+      .populate("serviceId", "name")
+      .lean();
+
+    if (orders.length === 0) {
+      return res.status(403).json({
+        message: "لا يمكنك الوصول إلى ملف عميل لم تتعامل معه",
+      });
+    }
+
+    res.json({ customer, orders });
+  } catch (err) {
+    console.error("getCustomerForWorker error:", err);
+    res.status(500).json({ message: "خطأ في تحميل ملف العميل" });
+  }
+};
+
 module.exports = {
   createOrder,
   updateOrderStatusByWorker,
   cancelOrderByCustomer,
   respondToCancellationByWorker,
+  createWorkerInitiatedOrder,
+  confirmWorkerOrder,
+  rejectWorkerOrder,
+  getCustomerForWorker,
 };

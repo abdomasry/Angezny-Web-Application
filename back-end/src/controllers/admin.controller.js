@@ -211,11 +211,15 @@ const getVerificationRequests = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    const requests = rawRequests.map((request) => {
-      const item = request.toObject();
-      item.requestType = request.verificationStatus === "pending" ? "profile" : "license";
-      return item;
-    });
+    // Skip profiles whose User was deleted (orphans). They can't be acted
+    // on and they would crash the admin UI's renderer.
+    const requests = rawRequests
+      .filter((request) => request.userId)
+      .map((request) => {
+        const item = request.toObject();
+        item.requestType = request.verificationStatus === "pending" ? "profile" : "license";
+        return item;
+      });
 
     res.json({
       requests,
@@ -407,6 +411,36 @@ const getOrders = async (req, res) => {
   } catch (error) {
     console.error("getOrders error:", error);
     res.status(500).json({ message: "Server error fetching orders" });
+  }
+};
+
+// ============================================================
+// GET /api/admin/orders/:id
+// ============================================================
+// Returns one fully-populated order for the admin detail page.
+// Populates customer, worker, category, service, and payment so the
+// frontend can render every section without follow-up calls.
+const getOrderById = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "معرّف الطلب غير صحيح" });
+    }
+
+    const order = await ServiceRequest.findById(req.params.id)
+      .populate("customerId", "firstName lastName profileImage email phone")
+      .populate("workerId", "firstName lastName profileImage email phone")
+      .populate("categoryId", "name")
+      .populate("serviceId", "name images price typeofService priceRange")
+      .populate("payment");
+
+    if (!order) {
+      return res.status(404).json({ message: "الطلب غير موجود" });
+    }
+
+    res.json({ order });
+  } catch (error) {
+    console.error("getOrderById error:", error);
+    res.status(500).json({ message: "Server error fetching order" });
   }
 };
 
@@ -727,6 +761,7 @@ module.exports = {
   getReports,
   updateReport,
   getOrders,
+  getOrderById,
   updateOrderStatus,
   getPendingServices,
   approveService,

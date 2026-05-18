@@ -9,11 +9,15 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const nextConfig: NextConfig = {
   // Pin the workspace root to this folder. Without this, Next 16 / Turbopack
   // walks up the tree looking for the closest package.json + package-lock.json
-  // pair. Because there's a stray package.json at the project's parent
-  // directory, Next was inferring THAT as the workspace root and looking for
-  // node_modules (tailwindcss, etc.) one level too high — which broke module
-  // resolution and caused the dev server to spin until V8 OOMed during cache
-  // deserialization. Pinning here makes Next ignore the parent lockfile.
+  // pair. If a stray package.json appears at the project's parent directory
+  // (e.g. an accidental `npm install` run from the wrong cwd), Next infers
+  // THAT as the workspace root and looks for node_modules (tailwindcss,
+  // next-intl, etc.) one level too high — which breaks module resolution
+  // and causes the dev server to spin until V8 OOMs during cache
+  // deserialization. Pinning here makes Next ignore any parent lockfile.
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
 
   // Allow next/image to optimize images served from Cloudinary (where chat
   // attachments, avatars, portfolio shots, and license documents all live).

@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Heart, MapPin, Star } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import HeartButton from '@/components/HeartButton'
 import RankBadge from '@/components/RankBadge'
@@ -22,6 +23,7 @@ import type { FavoriteWorkerCard, FavoritesListResponse } from '@/lib/types'
 
 export default function FavoritesPage() {
   const router = useRouter()
+  const t = useTranslations('favoritesPage')
   const { isLoggedIn, isLoading } = useAuth()
   const { ids } = useFavorites() // re-render when toggled so the card disappears
   const [cards, setCards] = useState<FavoriteWorkerCard[]>([])
@@ -59,9 +61,9 @@ export default function FavoritesPage() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Heart className="w-8 h-8 text-red-500 fill-red-500" />
-            المفضلة
+            {t('title')}
           </h1>
-          <p className="text-on-surface-variant mt-2">مقدمو الخدمة الذين أضفتهم لقائمة المفضلة</p>
+          <p className="text-on-surface-variant mt-2">{t('subtitle')}</p>
         </header>
 
         {loading ? (
@@ -73,13 +75,13 @@ export default function FavoritesPage() {
         ) : visible.length === 0 ? (
           <div className="text-center py-24 bg-surface-container-lowest rounded-2xl border border-outline-variant/10">
             <Heart className="w-16 h-16 text-on-surface-variant/20 mx-auto mb-4" />
-            <h2 className="text-xl font-bold mb-2">لم تقم بإضافة أي مقدم خدمة إلى المفضلة بعد</h2>
-            <p className="text-on-surface-variant mb-6">تصفح المزودين وأضفهم لقائمتك بالنقر على أيقونة القلب</p>
+            <h2 className="text-xl font-bold mb-2">{t('emptyTitle')}</h2>
+            <p className="text-on-surface-variant mb-6">{t('emptyBody')}</p>
             <Link
               href="/providers"
               className="inline-block bg-primary text-on-primary px-6 py-3 rounded-xl font-bold hover:bg-primary-container transition-colors"
             >
-              تصفح مقدمي الخدمات
+              {t('browseCta')}
             </Link>
           </div>
         ) : (

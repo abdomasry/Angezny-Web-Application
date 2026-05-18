@@ -12,7 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
 import {
   Calendar, MapPin, StickyNote, Tag, CreditCard, Wallet,
-  CheckCircle2, Loader2, AlertCircle, ShieldCheck,
+  CheckCircle2, Loader2, AlertCircle, ShieldCheck, Camera,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import { api } from '@/lib/api'
@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/auth-context'
 import { checkoutSchema, type CheckoutValues } from '@/lib/schemas'
 import type { PaymentMethod, WorkerService } from '@/lib/types'
 import AddressPicker, { type PickedAddress } from '@/components/AddressPicker/AddressPicker'
+import ProblemImagesPicker from '@/components/ProblemImagesPicker'
 
 // Shape the /api/workers/service/:id endpoint returns (populated chain).
 interface CheckoutService extends WorkerService {
@@ -83,6 +84,14 @@ function CheckoutContent() {
   const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null)
   const [couponError, setCouponError] = useState('')
 
+  // ─── Problem images (Cloudinary URLs the customer attached) ──────────
+  // Kept outside react-hook-form because uploads are async + parallel; mixing
+  // them into the form schema would require either re-validating on every
+  // upload tick or special-casing async validators. State + a "busy" flag
+  // that gates the submit button is simpler and matches the coupon pattern.
+  const [problemImages, setProblemImages] = useState<string[]>([])
+  const [imagesUploading, setImagesUploading] = useState(false)
+
   // ─── Top-level submit error (server-side rejections) ───────────────────
   const [submitError, setSubmitError] = useState('')
 
@@ -100,6 +109,16 @@ function CheckoutContent() {
     setValue('lng', picked.lng, { shouldDirty: true })
     if (picked.address && picked.address.trim()) {
       setValue('address', picked.address.trim(), { shouldDirty: true, shouldValidate: true })
+    }
+    // Carry the reverse-geocoded city + (normalized) governorate through to
+    // submit so the order doc ends up with them set. They get used by admin
+    // analytics' geography tab — without them every order would group under
+    // "غير محدد".
+    if (picked.city && picked.city.trim()) {
+      setValue('city', picked.city.trim(), { shouldDirty: true })
+    }
+    if (picked.governorate && picked.governorate.trim()) {
+      setValue('governorate', picked.governorate.trim(), { shouldDirty: true })
     }
   }
 
@@ -190,18 +209,20 @@ function CheckoutContent() {
   }
 
   // ─── Submit order ──────────────────────────────────────────────────────
+  // Two paths:
+  //   - cash_on_delivery: create the order; backend pings the worker. We
+  //     land the customer on their /profile orders tab.
+  //   - card: create the order in `pending` (no worker ping yet), then start
+  //     a Paymob checkout and redirect the browser there. The worker is
+  //     pinged from the payment webhook once Paymob confirms.
   const onSubmit = async (values: CheckoutValues) => {
     setSubmitError('')
-    if (values.paymentMode === 'card') {
-      setSubmitError('الدفع بالبطاقة غير متاح حالياً. يرجى اختيار الدفع عند الاستلام.')
-      return
-    }
     if (!serviceId) {
       setSubmitError('الخدمة غير محددة')
       return
     }
     try {
-      await api.postWithAuth('/customer/orders', {
+      const createResp = await api.postWithAuth('/customer/orders', {
         serviceId,
         scheduledDate: values.scheduledDate,
         address: values.address.trim(),
@@ -211,10 +232,31 @@ function CheckoutContent() {
         ...(typeof values.lat === 'number' && typeof values.lng === 'number'
           ? { lat: values.lat, lng: values.lng }
           : {}),
+        ...(values.governorate ? { governorate: values.governorate } : {}),
+        ...(values.city ? { city: values.city } : {}),
         notes: (values.notes || '').trim(),
         paymentMode: values.paymentMode,
         couponCode: coupon?.code || undefined,
+        ...(problemImages.length > 0 ? { problemImages } : {}),
       })
+
+      if (values.paymentMode === 'card') {
+        const orderId = createResp?.order?._id
+        if (!orderId) {
+          setSubmitError('تعذر بدء عملية الدفع')
+          return
+        }
+        // Hand off to Paymob's hosted checkout. The browser fully navigates
+        // away; we don't render anything after this point.
+        const checkout = await api.postWithAuth('/payments/checkout', { orderId })
+        if (!checkout?.checkoutUrl) {
+          setSubmitError('تعذر توجيهك إلى صفحة الدفع')
+          return
+        }
+        window.location.href = checkout.checkoutUrl
+        return
+      }
+
       router.push('/profile?tab=in_progress')
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'تعذّر إنشاء الطلب')
@@ -418,6 +460,19 @@ function CheckoutContent() {
             )}
           </section>
 
+          {/* Problem images — optional photos of what needs fixing */}
+          <section className="bg-surface-container-lowest p-5 rounded-xl space-y-3 shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
+            <h3 className="flex items-center gap-2 text-base font-bold text-on-surface border-r-4 border-primary pr-3">
+              <Camera className="w-5 h-5 text-primary" />
+              صور المشكلة (اختياري)
+            </h3>
+            <ProblemImagesPicker
+              value={problemImages}
+              onChange={setProblemImages}
+              onUploadingChange={setImagesUploading}
+            />
+          </section>
+
           {/* Payment mode */}
           <section className="bg-surface-container-lowest p-5 rounded-xl space-y-4 shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
             <h3 className="flex items-center gap-2 text-base font-bold text-on-surface border-r-4 border-primary pr-3">
@@ -449,17 +504,18 @@ function CheckoutContent() {
                 </div>
               </label>
 
-              {/* Card — placeholder (disabled). The UI is intentionally left
-                  in place so a future payment-gateway wiring is a small swap. */}
-              <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-not-allowed transition-all opacity-60 ${
+              {/* Card / wallet / InstaPay — handled by Paymob's hosted
+                  checkout. The customer is redirected to Paymob after the
+                  order is created; the worker is only notified once payment
+                  is confirmed via the webhook. */}
+              <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                 paymentMode === 'card'
                   ? 'border-primary bg-primary/5'
-                  : 'border-outline-variant/30'
+                  : 'border-outline-variant/30 hover:border-outline-variant/60'
               }`}>
                 <input
                   type="radio"
                   value="card"
-                  disabled
                   className="mt-1 accent-primary"
                   {...register('paymentMode')}
                 />
@@ -467,9 +523,6 @@ function CheckoutContent() {
                   <div className="flex items-center gap-2 mb-1">
                     <CreditCard className="w-4 h-4 text-primary" />
                     <span className="font-bold text-on-surface">{t('checkout.paymentCard')}</span>
-                    <span className="ms-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                      {t('checkout.paymentCardSoon')}
-                    </span>
                   </div>
                   <p className="text-sm text-on-surface-variant mb-2">
                     {t('checkout.paymentCardDesc')}
@@ -491,11 +544,11 @@ function CheckoutContent() {
 
           {/* Coupon */}
           <section className="bg-surface-container-lowest p-5 rounded-xl space-y-3 shadow-[0_24px_24px_-12px_rgba(18,28,42,0.06)]">
-            <h3 className="flex items-center gap-2 text-base font-bold text-on-surface border-r-4 border-primary pr-3">
-              <Tag className="w-5 h-5 text-primary" />
-              {t('checkout.couponTitle')}
-            </h3>
-
+              <h3 className="flex items-center gap-2 text-base font-bold text-on-surface border-r-4 border-primary pr-3">
+                <Tag className="w-5 h-5 text-primary" />
+                {t('checkout.couponTitle')}
+              </h3>
+            
             {coupon ? (
               <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -574,7 +627,7 @@ function CheckoutContent() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isSubmitting || paymentMode === 'card'}
+            disabled={isSubmitting || imagesUploading}
             className="w-full bg-primary text-on-primary py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 hover:bg-primary-container transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
           >
             {isSubmitting ? (

@@ -71,7 +71,10 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "worker", "admin"],
+      // "ai" is a reserved system role for the single AI-assistant user
+      // (see scripts/seed-ai-user.js). Cannot be assigned via signup —
+      // only the seed script creates it.
+      enum: ["customer", "worker", "admin", "ai"],
       default: "customer",
     },
     profileImage: String,

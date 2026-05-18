@@ -23,7 +23,9 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Loader2, MapPin, X, Crosshair, Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useUserLocation } from '@/hooks/useUserLocation'
+import { normalizeGovernorate } from '@/lib/constants/governorates'
 
 // Lazy-loaded — Leaflet code lands in the browser only on first open.
 const LeafletMap = dynamic(() => import('./LeafletMap'), {
@@ -43,6 +45,9 @@ export interface PickedAddress {
   address?: string
   city?: string
   area?: string
+  // Normalized against EGYPTIAN_GOVERNORATES so analytics group keys
+  // match the values workers pick from the dropdown.
+  governorate?: string
 }
 
 interface Props {
@@ -88,7 +93,7 @@ async function searchPlaces(query: string): Promise<SearchResult[]> {
 //     and Nominatim's public CDN is the right surface for browser callers
 //   • giving up silently on any failure: the user can still type fields
 async function reverseGeocode(lat: number, lng: number): Promise<{
-  address?: string; city?: string; area?: string
+  address?: string; city?: string; area?: string; governorate?: string
 } | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar&zoom=18&addressdetails=1`
@@ -104,10 +109,16 @@ async function reverseGeocode(lat: number, lng: number): Promise<{
     // them in decreasing specificity. Same for the neighborhood/area.
     const city = a.city || a.town || a.village || a.municipality || a.county || ''
     const area = a.suburb || a.neighbourhood || a.quarter || a.district || a.city_district || ''
+    // `a.state` is what Nominatim calls the governorate in Egypt. Normalize
+    // it against our canonical list so the value matches what workers pick
+    // from the dropdown (e.g. "محافظة القاهرة" → "القاهرة"). Unknown values
+    // become undefined and the field stays unset on the order.
+    const governorate = normalizeGovernorate(a.state) || undefined
     return {
       address: data.display_name || '',
       city,
       area,
+      governorate,
     }
   } catch {
     return null
@@ -115,6 +126,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<{
 }
 
 export default function AddressPicker({ open, initial, onConfirm, onClose }: Props) {
+  const t = useTranslations('addressPicker')
   const { coords: cachedCoords, status: geoStatus, request: requestLocation } = useUserLocation()
 
   // Current pin. Starts at:
@@ -234,13 +246,13 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
         <div className="flex items-center justify-between p-5 border-b border-outline-variant/20">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <MapPin className="w-5 h-5 text-primary" />
-            تحديد الموقع على الخريطة
+            {t('title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-surface-container-high"
-            aria-label="إغلاق"
+            aria-label={t('close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -257,14 +269,14 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length > 0 && setResultsOpen(true)}
-              placeholder="ابحث عن عنوان (مثال: المعادي، القاهرة)"
+              placeholder={t('searchPlaceholder')}
               className="w-full bg-surface-container-low rounded-xl pr-4 pl-12 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 outline-none text-right"
             />
             <button
               type="submit"
               disabled={searching || !searchQuery.trim()}
               className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-primary text-on-primary disabled:opacity-40 hover:bg-primary-container transition-colors"
-              aria-label="بحث"
+              aria-label={t('searchAria')}
             >
               {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             </button>
@@ -277,7 +289,7 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
             <div className="absolute z-401 left-5 right-5 top-full mt-1 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 max-h-64 overflow-y-auto">
               {searchResults.length === 0 ? (
                 <p className="p-3 text-xs text-on-surface-variant text-center">
-                  لا توجد نتائج.
+                  {t('noResults')}
                 </p>
               ) : (
                 searchResults.map(r => (
@@ -300,12 +312,12 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
         {geoStatus === 'requesting' && !pin && (
           <div className="px-5 py-3 bg-surface-container-low text-sm text-on-surface-variant flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            جاري الحصول على موقعك...
+            {t('locating')}
           </div>
         )}
         {geoStatus === 'denied' && !pin && (
           <div className="px-5 py-3 bg-error-container/40 text-sm text-on-error-container">
-            تم رفض الوصول إلى الموقع — يمكنك النقر على الخريطة لتحديد العنوان يدوياً.
+            {t('denied')}
           </div>
         )}
 
@@ -323,10 +335,10 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
             type="button"
             onClick={handleUseMyLocation}
             className="absolute top-3 right-3 z-400 bg-surface-container-lowest text-on-surface px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-sm font-bold hover:bg-surface-container-high"
-            title="موقعي الحالي"
+            title={t('myLocation')}
           >
             <Crosshair className="w-4 h-4 text-primary" />
-            موقعي الحالي
+            {t('myLocation')}
           </button>
         </div>
 
@@ -334,12 +346,12 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
         <div className="p-5 border-t border-outline-variant/20 space-y-3">
           {pin ? (
             <p className="text-xs text-on-surface-variant text-center">
-              النقطة المختارة: {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
-              <span className="block mt-1">يمكنك سحب الدبوس أو النقر في أي مكان على الخريطة لتعديله</span>
+              {t('chosen', { lat: pin.lat.toFixed(5), lng: pin.lng.toFixed(5) })}
+              <span className="block mt-1">{t('dragHint')}</span>
             </p>
           ) : (
             <p className="text-xs text-on-surface-variant text-center">
-              انقر على الخريطة لاختيار موقعك
+              {t('clickHint')}
             </p>
           )}
           <div className="flex gap-2">
@@ -352,9 +364,9 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
               {confirming ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  جاري التأكيد...
+                  {t('confirming')}
                 </>
-              ) : 'تأكيد الموقع'}
+              ) : t('confirm')}
             </button>
             <button
               type="button"
@@ -362,7 +374,7 @@ export default function AddressPicker({ open, initial, onConfirm, onClose }: Pro
               disabled={confirming}
               className="flex-1 bg-surface-container-low py-3 rounded-xl font-bold disabled:opacity-40"
             >
-              إلغاء
+              {t('cancel')}
             </button>
           </div>
         </div>

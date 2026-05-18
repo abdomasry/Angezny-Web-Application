@@ -64,6 +64,7 @@ interface ServiceDetail extends WorkerService {
 // number a user sees on the listing matches what they see on the detail page.
 function formatPrice(service: ServiceDetail | null) {
   if (!service) return ''
+  if (service.typeofService === 'custom') return 'سعر مخصص'
   if (service.typeofService === 'range' && service.priceRange) {
     return `${service.priceRange.min ?? 0} – ${service.priceRange.max ?? 0} ج.م`
   }
@@ -424,24 +425,38 @@ export default function ServiceDetailPage() {
               </Link>
             )}
 
-            {/* CTAs */}
+            {/* CTAs — custom-priced services skip the order button entirely.
+                The customer must chat with the worker; the worker creates the
+                actual order from the customer's profile. */}
             <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={handleOrder}
-                className="w-full inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-3.5 rounded-2xl hover:bg-primary-container transition-colors shadow-sm"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>اطلب هذه الخدمة الآن</span>
-              </button>
+              {service?.typeofService !== 'custom' && (
+                <button
+                  type="button"
+                  onClick={handleOrder}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-bold py-3.5 rounded-2xl hover:bg-primary-container transition-colors shadow-sm"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>اطلب هذه الخدمة الآن</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleAsk}
                 disabled={asking}
-                className="w-full inline-flex items-center justify-center gap-2 border border-outline-variant/30 text-on-surface font-semibold py-3 rounded-2xl hover:bg-surface-container-low transition-colors disabled:opacity-60 disabled:cursor-wait"
+                className={`w-full inline-flex items-center justify-center gap-2 font-bold py-3 rounded-2xl transition-colors disabled:opacity-60 disabled:cursor-wait ${
+                  service?.typeofService === 'custom'
+                    ? 'bg-primary text-on-primary hover:bg-primary-container shadow-sm'
+                    : 'border border-outline-variant/30 text-on-surface hover:bg-surface-container-low'
+                }`}
               >
                 <MessageCircleQuestion className="w-4 h-4" />
-                <span>{asking ? 'جارٍ فتح المحادثة...' : 'استفسر قبل الطلب'}</span>
+                <span>
+                  {asking
+                    ? 'جارٍ فتح المحادثة...'
+                    : service?.typeofService === 'custom'
+                      ? 'اسأل الحرفي للحصول على السعر'
+                      : 'استفسر قبل الطلب'}
+                </span>
               </button>
               {askError && (
                 <p

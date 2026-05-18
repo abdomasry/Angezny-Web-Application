@@ -165,6 +165,7 @@ const getWorkers = async (req, res) => {
           match: {
             active: true,
             approvalStatus: "approved",
+            isPrivate: { $ne: true },
             ...(category && (() => {
               const ids = String(category).split(",").map(s => s.trim()).filter(Boolean);
               return ids.length > 1 ? { categoryId: { $in: ids } } : { categoryId: ids[0] };
@@ -205,7 +206,7 @@ const getWorkers = async (req, res) => {
           .populate("serviceCategories", "name image")
           .populate({
             path: "services",
-            match: { active: true, approvalStatus: "approved" },
+            match: { active: true, approvalStatus: "approved", isPrivate: { $ne: true } },
             select: "name description images price typeofService priceRange categoryId",
           })
           .sort({ ratingAverage: -1 })
@@ -255,6 +256,7 @@ const getWorkers = async (req, res) => {
         match: {
           active: true,
           approvalStatus: "approved",
+          isPrivate: { $ne: true },
           ...(category && (() => {
             const ids = String(category).split(",").map(s => s.trim()).filter(Boolean);
             return ids.length > 1 ? { categoryId: { $in: ids } } : { categoryId: ids[0] };
@@ -348,7 +350,7 @@ const getWorkerById = async (req, res) => {
       .populate("serviceCategories", "name image")
       .populate({
         path: "services",
-        match: { active: true, approvalStatus: "approved" },
+        match: { active: true, approvalStatus: "approved", isPrivate: { $ne: true } },
         select: "name description images price typeofService priceRange categoryId",
         populate: { path: "categoryId", select: "name" },
       });
@@ -459,7 +461,7 @@ const getServiceById = async (req, res) => {
       return res.status(404).json({ message: "Service not found" });
     }
     // Only expose services that are publicly orderable.
-    if (!service.active || service.approvalStatus !== "approved") {
+    if (!service.active || service.approvalStatus !== "approved" || service.isPrivate) {
       return res.status(404).json({ message: "Service not available" });
     }
 

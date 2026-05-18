@@ -10,6 +10,7 @@ const {
   getReports,
   updateReport,
   getOrders,
+  getOrderById,
   updateOrderStatus,
   getPendingServices,
   approveService,
@@ -35,6 +36,7 @@ router.put("/verification/:id", authMiddleware, adminOnly, handleVerification);
 router.get("/reports", authMiddleware, adminOnly, getReports);
 router.put("/reports/:id", authMiddleware, adminOnly, updateReport);
 router.get("/orders", authMiddleware, adminOnly, getOrders);
+router.get("/orders/:id", authMiddleware, adminOnly, getOrderById);
 router.put("/orders/:id/status", authMiddleware, adminOnly, updateOrderStatus);
 router.get("/pending-services", authMiddleware, adminOnly, getPendingServices);
 router.put("/services/:id/approve", authMiddleware, adminOnly, approveService);

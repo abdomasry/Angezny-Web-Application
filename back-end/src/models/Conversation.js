@@ -3,6 +3,18 @@ const mongoose = require('mongoose');
 // Conversation — represents a 1-to-1 DM channel between two users.
 const conversationSchema = new mongoose.Schema(
   {
+    // "human" = the regular customer↔worker DM.
+    // "ai"    = a chat between a regular user and the system AI assistant.
+    //           One per user, lazy-created the first time they open /messages.
+    //           The socket handler branches on this so AI conversations get
+    //           rate-limiting, topic classification, and Groq streaming —
+    //           regular human chats keep their existing behavior untouched.
+    type: {
+      type: String,
+      enum: ["human", "ai"],
+      default: "human",
+      index: true,
+    },
     participants: [
       {
         type: mongoose.Schema.Types.ObjectId,

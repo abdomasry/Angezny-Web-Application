@@ -181,7 +181,12 @@ const getOrders = async (req, res) => {
     // Decide which statuses to filter by based on the status parameter.
     let statusFilter;
     if (status === "in_progress") {
-      statusFilter = ["pending", "accepted", "in_progress"];
+      // pending_customer_confirmation is also "active" from the customer's
+      // perspective — these are worker-initiated orders waiting on the
+      // customer to confirm + pay. The frontend can split them into a
+      // dedicated Pending Confirmation section using `initiatedBy` +
+      // `status`, but they need to be loaded together with active orders.
+      statusFilter = ["pending", "pending_customer_confirmation", "accepted", "in_progress"];
     } else {
       // "history" — orders that have reached a final state
       statusFilter = ["completed", "cancelled", "rejected"];

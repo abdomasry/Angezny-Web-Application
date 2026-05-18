@@ -156,6 +156,27 @@ const workerProfileSchema = new mongoose.Schema(
     walletBalance: { type: Number, default: 0 },
     lifetimeEarnings: { type: Number, default: 0 },
     lifetimeWithdrawn: { type: Number, default: 0 },
+    // ─── Payout destination ──────────────────────────────────────
+    // Where the worker wants withdrawal money sent. Set via
+    // POST /api/worker/payouts/info. `method` picks which of the three
+    // detail blocks below is actually used at withdrawal time. All inner
+    // fields are optional individually; the controller enforces that the
+    // right block is filled in for the selected method.
+    payoutInfo: {
+      method: {
+        type: String,
+        enum: ["bank", "instapay", "wallet"],
+      },
+      // Bank transfer destination
+      bankAccountNumber: String,
+      bankName: String,
+      accountHolderName: String,
+      // InstaPay alias, e.g. "abdullah@instapay"
+      instapayAlias: String,
+      // Mobile-wallet phone number, e.g. "01012345678"
+      walletPhone: String,
+      updatedAt: Date,
+    },
     // ─── Rank system ─────────────────────────────────────────────
     // Server-managed. Set automatically by the order-completion hook
     // (see order.controller.js). Clients must not write these.

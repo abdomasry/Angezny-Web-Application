@@ -13,13 +13,35 @@ const serviceRequestSchema = new mongoose.Schema(
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "WorkerServices",
-      required: true,
     },
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
     },
+    initiatedBy: {
+      type: String,
+      enum: ["customer", "worker"],
+      default: "customer",
+    },
+    customTitle: { type: String, default: null },
+    customPrice: { type: Number, default: null },
+    paymentTiming: {
+      type: String,
+      enum: ["before", "after"],
+      default: "before",
+    },
     description: String,
+    // Up to 5 Cloudinary URLs uploaded by the customer at order creation
+    // to illustrate the problem (broken pipe, cracked tile, etc.). Same
+    // storage pattern as completionReport.images — strings only, no metadata.
+    problemImages: {
+      type: [{ type: String }],
+      validate: [
+        (arr) => Array.isArray(arr) && arr.length <= 5,
+        "Maximum 5 problem images allowed",
+      ],
+      default: [],
+    },
     location: {
       address: String,
       governorate: String,
@@ -71,6 +93,7 @@ const serviceRequestSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending",
+        "pending_customer_confirmation",
         "accepted",
         "rejected",
         "in_progress",

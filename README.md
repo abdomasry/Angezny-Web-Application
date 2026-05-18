@@ -27,6 +27,7 @@ or add someone by yourself :)
 | Database | MongoDB (Atlas) |
 | Auth | JWT (7-day expiry), bcrypt password hashing |
 | Real-time | Socket.IO (chat + presence + notifications) |
+| Payments | Paymob (card / wallet checkout) + cash-on-delivery |
 | Email | Brevo — verification + password reset |
 | File uploads | Cloudinary (unsigned uploads from the browser) |
 | Maps | Leaflet + OpenStreetMap (Nominatim geocoding) |
@@ -65,6 +66,7 @@ or add someone by yourself :)
 - Browse workers and services with category, price-range, and rating filters
 - Sort by rating, price, popularity, or alphabetical
 - Geolocation-aware "Nearest" tab (browser permission, distance display)
+- Live **distance counter** on the service detail page (km between customer and worker)
 - Quick-filter tabs: All / Top-Rated / Verified / Nearest
 - Debounced search autocomplete (services + categories)
 - Top-searched terms surfaced on the home page
@@ -79,6 +81,8 @@ or add someone by yourself :)
 - Create order with service date/time picker
 - Pick service location via map (address + lat/lng for worker precision)
 - Order notes / comments
+- Attach up to 5 **problem images** to an order so the worker sees the issue before arriving
+- Submit **custom order requests** when no listed service fits (free-form description + price proposal)
 - View active orders (pending, accepted, in-progress) and history (completed, cancelled, rejected)
 - Cancel pending / accepted orders with optional reason
 - Respond to worker cancellation requests
@@ -89,6 +93,7 @@ or add someone by yourself :)
 - View worker reviews with pagination
 
 **Payments & wallet**
+- **Paymob** online checkout (card / mobile wallet) with hosted payment flow
 - Save credit cards (Visa, Mastercard, Meeza) with brand icons
 - Set default payment method
 - Cash-on-delivery option
@@ -151,6 +156,8 @@ or add someone by yourself :)
 **Order management**
 - Accept / reject pending orders (with reason)
 - Mark in-progress, complete with report (text + up to 6 images)
+- See customer-attached **problem images** on the order card
+- Receive and price-quote **custom order requests** from customers
 - Cancel accepted / in-progress orders, request customer approval
 - Respond to customer cancellation requests
 - View customer info, address text, and pinned location on map
@@ -187,6 +194,7 @@ or add someone by yourself :)
 
 **Orders**
 - View all platform orders, admin status overrides, cancellation tracking
+- **Order detail page** (`/admin/orders/[id]`): click any order row to drill into full timeline, customer + worker info, pinned location, problem images, and completion report
 
 **Coupon management**
 - Create coupons (percentage / fixed, min purchase / qty, max uses, expiry)
@@ -222,6 +230,11 @@ or add someone by yourself :)
 - Unread message count per conversation
 - Last-message preview and timestamps
 - Chat notifications, presence
+
+### AI Assistant
+- In-app **AI bot** that answers questions about the platform (how to book, payment, refunds, becoming a provider, etc.)
+- Backed by a curated knowledge base (`ai-knowledge.js`) so replies stay on-topic
+- Available from the chat widget alongside real worker conversations
 
 ### Notifications
 - In-app bell with unread count and dropdown list

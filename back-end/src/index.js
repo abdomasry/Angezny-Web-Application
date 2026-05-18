@@ -23,11 +23,51 @@ const favoritesRoutes = require("./routes/favorites.routes");
 const customerPublicRoutes = require("./routes/customer-public.routes");
 const supportRoutes = require("./routes/support.routes");
 const providerApplicationRoutes = require("./routes/provider-application.routes");
+const paymentRoutes = require("./routes/payment.routes");
+const payoutRoutes = require("./routes/payout.routes");
 const attachChatSocket = require("./socket/chat.socket");
+const User = require("./models/User.Model");
 
 
 
 connectDB();
+
+// ============================================================
+// AI assistant — cache the system AI user's _id once at startup.
+// The chat-socket handler reads global.AI_USER_ID on every message to
+// decide whether a conversation is human↔human or human↔AI. Doing the
+// lookup once and stashing it on a global avoids hitting Mongo for every
+// single chat:send.
+//
+// The seed (scripts/seed-ai-user.js) creates this user; we only LOOK it
+// up here. If it isn't found, AI features stay dormant (the controller
+// + socket handler gate on global.AI_USER_ID and silently behave like
+// the old, AI-free chat).
+// ============================================================
+async function loadAiUserId() {
+  const email = (process.env.AI_USER_EMAIL || "ai-assistant@system.local").toLowerCase();
+  // Mongo connection may not be ready immediately after the dotenv tick.
+  // A small retry (max ~10s) gives connectDB() time to finish without us
+  // having to await it explicitly here.
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const user = await User.findOne({ email, role: "ai" }).select("_id");
+      if (user) {
+        global.AI_USER_ID = String(user._id);
+        console.log(`AI assistant user resolved: _id=${global.AI_USER_ID}`);
+        return;
+      }
+      // Found nothing — no need to retry; the seed hasn't been run.
+      console.warn(`AI assistant user NOT found (email=${email}). Run: node src/scripts/seed-ai-user.js`);
+      return;
+    } catch (err) {
+      // Likely "Topology is closed" before Mongo finishes connecting. Wait + retry.
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  console.error("Failed to load AI user id after 10 attempts");
+}
+setImmediate(loadAiUserId);
 
 const app = express();
 app.set("trust proxy", 1);
@@ -74,6 +114,12 @@ app.use("/api/favorites", favoritesRoutes);
 app.use("/api/customers", customerPublicRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/provider-applications", providerApplicationRoutes);
+// Paymob pay-in (customer → platform) and payout (platform → worker).
+// Paymob's HMAC is computed over individual JSON fields (not the raw body),
+// so the standard express.json() parser above is enough — no raw-body
+// middleware needed.
+app.use("/api/payments", paymentRoutes);
+app.use("/api/worker/payouts", payoutRoutes);
 
 // Create an explicit HTTP server so Socket.IO can attach to it.
 // Using app.listen() directly would give Express its own server we can't share.

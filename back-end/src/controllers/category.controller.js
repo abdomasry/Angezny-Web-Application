@@ -12,7 +12,7 @@ const getAll = async (req, res) => {
     if (req.query.withCounts === "true") {
       // One aggregation query: group active services by categoryId, sum counts.
       const counts = await WorkerServices.aggregate([
-        { $match: { active: true, approvalStatus: "approved" } },
+        { $match: { active: true, approvalStatus: "approved", isPrivate: { $ne: true } } },
         { $group: { _id: "$categoryId", count: { $sum: 1 } } },
       ]);
 

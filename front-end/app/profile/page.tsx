@@ -21,6 +21,7 @@ import {
   Save, Settings, History, BadgeCheck, Home, Briefcase, X as XIcon,
   MessageSquare, Camera, Loader2,
 } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 import Navbar from '@/components/Navbar'
 import CancelOrderModal from '@/components/CancelOrderModal'
 import ReviewOrderModal from '@/components/ReviewOrderModal'
@@ -34,14 +35,15 @@ import type {
   PaymentMethod, NotificationPreferences, Category,
 } from '@/lib/types'
 
-// Status badge config — maps order status to Arabic label + colors.
-const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  pending:     { label: 'قيد الانتظار', bg: 'bg-amber-50',   text: 'text-amber-600' },
-  accepted:    { label: 'مقبول',        bg: 'bg-blue-50',    text: 'text-blue-600' },
-  in_progress: { label: 'قيد التنفيذ',  bg: 'bg-primary/10', text: 'text-primary' },
-  completed:   { label: 'مكتمل',        bg: 'bg-green-50',   text: 'text-green-600' },
-  rejected:    { label: 'مرفوض',        bg: 'bg-red-50',     text: 'text-red-600' },
-  cancelled:   { label: 'ملغي',         bg: 'bg-gray-100',   text: 'text-gray-500' },
+// Status badge color config — labels come from i18n.
+const statusColors: Record<string, { bg: string; text: string; key: string }> = {
+  pending:     { bg: 'bg-amber-50',   text: 'text-amber-600', key: 'statusPending' },
+  pending_customer_confirmation: { bg: 'bg-orange-50', text: 'text-orange-600', key: 'statusPending' },
+  accepted:    { bg: 'bg-blue-50',    text: 'text-blue-600',  key: 'statusAccepted' },
+  in_progress: { bg: 'bg-primary/10', text: 'text-primary',   key: 'statusInProgress' },
+  completed:   { bg: 'bg-green-50',   text: 'text-green-600', key: 'statusCompleted' },
+  rejected:    { bg: 'bg-red-50',     text: 'text-red-600',   key: 'statusRejected' },
+  cancelled:   { bg: 'bg-gray-100',   text: 'text-gray-500',  key: 'statusCancelled' },
 }
 
 type Section = 'overview' | 'addresses' | 'payment' | 'orders' | 'settings'
@@ -66,13 +68,17 @@ interface AddressDraft {
 }
 
 const EMPTY_ADDRESS: AddressDraft = {
-  label: 'المنزل', addressLine: '', city: '', area: '', isPrimary: false,
+  label: '', addressLine: '', city: '', area: '', isPrimary: false,
 }
 
 export default function ProfilePage() {
   const { user, isLoggedIn, isLoading: authLoading } = useAuth()
   const { ids: favoriteIds } = useFavorites()
   const router = useRouter()
+  const t = useTranslations('profile')
+  const tCommon = useTranslations('common')
+  const locale = useLocale()
+  const defaultAddressLabel = t('addresses.labelHome')
 
   // ─── Page-level state ───────────────────────────────────────────
   const [profile, setProfile] = useState<CustomerProfileData | null>(null)
@@ -93,6 +99,10 @@ export default function ProfilePage() {
   // Modal slots — null when closed.
   const [cancellingOrder, setCancellingOrder] = useState<ServiceRequest | null>(null)
   const [reviewingOrder, setReviewingOrder] = useState<ServiceRequest | null>(null)
+
+  // Per-order action state for worker-initiated pending confirmations.
+  const [pendingActionId, setPendingActionId] = useState<string | null>(null)
+  const [pendingActionError, setPendingActionError] = useState('')
 
   // ─── Personal-info draft (saved as a batch by the header button) ─
   // The batch saves name, phone, preferred language, and the chosen
@@ -178,7 +188,7 @@ export default function ProfilePage() {
 
   // ─── Helpers ────────────────────────────────────────────────────
   const getInitial = () => profile?.firstName?.charAt(0) || user?.firstName?.charAt(0) || '?'
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('ar-EG', {
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   })
   const memberYear = profile?.memberSince ? new Date(profile.memberSince).getFullYear() : null
@@ -194,6 +204,52 @@ export default function ProfilePage() {
 
   const markDirty = () => setBatchDirty(true)
 
+  // Reload current orders page (used after confirm/reject of a
+  // worker-initiated pending confirmation).
+  const reloadOrders = async () => {
+    const params = new URLSearchParams({ status: orderTab, page: String(currentPage), limit: '10' })
+    const d = await api.getWithAuth(`/customer/orders?${params.toString()}`)
+    setOrders(d.orders)
+    setPagination(d.pagination)
+  }
+
+  const handleConfirmWorkerOrder = async (orderId: string) => {
+    setPendingActionId(orderId)
+    setPendingActionError('')
+    try {
+      const result = await api.putWithAuth(`/customer/orders/${orderId}/confirm`, {})
+      if (result?.requiresPayment) {
+        // The order needs upfront card payment. Hand off to the existing
+        // checkout flow — same endpoint /payments/checkout will pick it up
+        // from pending_customer_confirmation status now that the controller
+        // allows it.
+        const checkout = await api.postWithAuth('/payments/checkout', { orderId })
+        if (checkout?.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl
+          return
+        }
+      }
+      await reloadOrders()
+    } catch (err: any) {
+      setPendingActionError(err?.message || 'تعذر تأكيد الطلب')
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  const handleRejectWorkerOrder = async (orderId: string) => {
+    setPendingActionId(orderId)
+    setPendingActionError('')
+    try {
+      await api.putWithAuth(`/customer/orders/${orderId}/reject`, {})
+      await reloadOrders()
+    } catch (err: any) {
+      setPendingActionError(err?.message || 'تعذر رفض الطلب')
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
   // Batch save: name + phone + language + favorite categories.
   const handleBatchSave = async () => {
     try {
@@ -208,7 +264,7 @@ export default function ProfilePage() {
       setProfile(data.profile)
       setBatchDirty(false)
     } catch (err: any) {
-      alert(err?.message || 'فشل حفظ التغييرات')
+      alert(err?.message || t('saveFailed'))
     } finally {
       setBatchSaving(false)
     }
@@ -222,7 +278,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      alert('الرجاء اختيار ملف صورة')
+      alert(t('avatarInvalidFile'))
       e.target.value = ''
       return
     }
@@ -232,7 +288,7 @@ export default function ProfilePage() {
       const data = await api.putWithAuth('/customer/profile', { profileImage: url })
       setProfile(data.profile)
     } catch (err: any) {
-      alert(err?.message || 'فشل رفع الصورة')
+      alert(err?.message || t('avatarUploadFailed'))
     } finally {
       setAvatarUploading(false)
       e.target.value = ''
@@ -242,7 +298,7 @@ export default function ProfilePage() {
   // ─── Address handlers ───────────────────────────────────────────
   // When opening an existing address that already has coords, pre-load
   // them into the draft so the picker centers on the saved pin.
-  const openAddAddress = () => setAddressDraft({ ...EMPTY_ADDRESS })
+  const openAddAddress = () => setAddressDraft({ ...EMPTY_ADDRESS, label: defaultAddressLabel })
   const openEditAddress = (a: AddressDraft) => {
     const coords = a.point?.coordinates
     setAddressDraft({
@@ -275,7 +331,7 @@ export default function ProfilePage() {
 
   const saveAddress = async () => {
     if (!addressDraft) return
-    if (!addressDraft.addressLine.trim()) return alert('العنوان التفصيلي مطلوب')
+    if (!addressDraft.addressLine.trim()) return alert(t('addresses.lineRequired'))
     try {
       setAddressSaving(true)
       const isEdit = Boolean(addressDraft._id)
@@ -296,7 +352,7 @@ export default function ProfilePage() {
       setAddresses(data.addresses)
       setAddressDraft(null)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحفظ')
+      alert(err?.message || t('addresses.saveFailed'))
     } finally {
       setAddressSaving(false)
     }
@@ -304,12 +360,12 @@ export default function ProfilePage() {
 
   const deleteAddress = async (id?: string) => {
     if (!id) return
-    if (!confirm('حذف هذا العنوان؟')) return
+    if (!confirm(t('addresses.deleteConfirm'))) return
     try {
       const data = await api.deleteWithAuth(`/customer/addresses/${id}`)
       setAddresses(data.addresses)
     } catch (err: any) {
-      alert(err?.message || 'فشل الحذف')
+      alert(err?.message || t('addresses.deleteFailed'))
     }
   }
 
@@ -321,7 +377,7 @@ export default function ProfilePage() {
       setShowAddCard(false)
       setCardForm({ cardholderName: '', lastFourDigits: '', cardBrand: 'visa', expiryMonth: 1, expiryYear: 2025 })
     } catch (err: any) {
-      alert(err?.message || 'فشل إضافة البطاقة')
+      alert(err?.message || t('payment.addFailed'))
     }
   }
   const handleDeleteCard = async (id: string) => {
@@ -365,11 +421,11 @@ export default function ProfilePage() {
   }
 
   const navItems: Array<{ key: Section; label: string; icon: any }> = [
-    { key: 'overview',  label: 'نظرة عامة',       icon: UserIcon },
-    { key: 'addresses', label: 'العناوين المسجلة', icon: MapPin },
-    { key: 'payment',   label: 'طرق الدفع',       icon: CreditCard },
-    { key: 'orders',    label: 'سجل الطلبات',     icon: History },
-    { key: 'settings',  label: 'إعدادات الحساب',  icon: Settings },
+    { key: 'overview',  label: t('nav.overview'),  icon: UserIcon },
+    { key: 'addresses', label: t('nav.addresses'), icon: MapPin },
+    { key: 'payment',   label: t('nav.payment'),   icon: CreditCard },
+    { key: 'orders',    label: t('nav.orders'),    icon: History },
+    { key: 'settings',  label: t('nav.settings'),  icon: Settings },
   ]
 
   return (
@@ -381,10 +437,10 @@ export default function ProfilePage() {
         <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-4xl font-extrabold text-on-surface mb-2 tracking-tight">
-              الملف الشخصي للعميل
+              {t('title')}
             </h1>
             <p className="text-on-surface-variant text-lg leading-relaxed">
-              أهلاً بك، {profile?.firstName || ''}! هنا يمكنك إدارة معلوماتك وتفضيلاتك بكل سهولة.
+              {t('welcome', { name: profile?.firstName || '' })}
             </p>
           </div>
           <button
@@ -394,7 +450,7 @@ export default function ProfilePage() {
             className="px-6 py-3 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <Save className="w-5 h-5" />
-            {batchSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+            {batchSaving ? t('saving') : t('saveChanges')}
           </button>
         </div>
 
@@ -446,7 +502,7 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
                     disabled={avatarUploading}
-                    aria-label="تغيير الصورة الشخصية"
+                    aria-label={t('avatarChange')}
                     className="absolute bottom-1 left-1 w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg hover:scale-110 transition-transform disabled:opacity-60 disabled:cursor-wait"
                   >
                     {avatarUploading ? (
@@ -470,7 +526,7 @@ export default function ProfilePage() {
                     </h2>
                     <p className="text-on-surface-variant flex items-center justify-center md:justify-start gap-2 mt-1">
                       <BadgeCheck className="w-4 h-4 text-primary" fill="currentColor" />
-                      عضو منذ {memberYear || '...'}
+                      {t('memberSince', { year: memberYear || '...' })}
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-center md:justify-start gap-3">
@@ -479,7 +535,7 @@ export default function ProfilePage() {
                         <ShoppingBag className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-xs text-on-surface-variant font-medium">إجمالي الحجوزات</p>
+                        <p className="text-xs text-on-surface-variant font-medium">{t('totalOrders')}</p>
                         <p className="text-lg font-bold">{profile?.numberOfOrders ?? 0}</p>
                       </div>
                     </div>
@@ -491,7 +547,7 @@ export default function ProfilePage() {
                         <Heart className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-xs text-on-surface-variant font-medium">العمال المفضلين</p>
+                        <p className="text-xs text-on-surface-variant font-medium">{t('favoriteWorkers')}</p>
                         <p className="text-lg font-bold">{favoriteIds.size}</p>
                       </div>
                     </Link>
@@ -504,11 +560,11 @@ export default function ProfilePage() {
               <section className="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <UserIcon className="w-5 h-5 text-primary" />
-                  المعلومات الشخصية
+                  {t('personalInfo')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-on-surface-variant">الاسم الأول</label>
+                    <label className="block text-sm font-medium text-on-surface-variant">{t('firstName')}</label>
                     <input
                       type="text"
                       value={nameDraft.firstName}
@@ -517,7 +573,7 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-on-surface-variant">الاسم الأخير</label>
+                    <label className="block text-sm font-medium text-on-surface-variant">{t('lastName')}</label>
                     <input
                       type="text"
                       value={nameDraft.lastName}
@@ -526,17 +582,17 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-on-surface-variant">البريد الإلكتروني</label>
+                    <label className="block text-sm font-medium text-on-surface-variant">{t('email')}</label>
                     <input
                       type="email"
                       value={profile?.email || ''}
                       readOnly
                       className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-on-surface-variant cursor-not-allowed"
                     />
-                    <p className="text-xs text-on-surface-variant">البريد الإلكتروني غير قابل للتعديل من هذه الصفحة.</p>
+                    <p className="text-xs text-on-surface-variant">{t('emailReadonlyHint')}</p>
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-on-surface-variant">رقم الهاتف</label>
+                    <label className="block text-sm font-medium text-on-surface-variant">{t('phone')}</label>
                     <input
                       type="tel"
                       dir="ltr"
@@ -546,14 +602,14 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-on-surface-variant">اللغة المفضلة</label>
+                    <label className="block text-sm font-medium text-on-surface-variant">{t('preferredLanguage')}</label>
                     <select
                       value={languageDraft}
                       onChange={(e) => { setLanguageDraft(e.target.value as 'ar' | 'en'); markDirty() }}
                       className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="ar">العربية</option>
-                      <option value="en">English</option>
+                      <option value="ar">{tCommon('arabic')}</option>
+                      <option value="en">{tCommon('english')}</option>
                     </select>
                   </div>
                 </div>
@@ -563,10 +619,10 @@ export default function ProfilePage() {
               <section className="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Heart className="w-5 h-5 text-primary" />
-                  الخدمات المفضلة
+                  {t('favoriteServices')}
                 </h3>
                 {categories.length === 0 ? (
-                  <p className="text-on-surface-variant text-sm">جاري التحميل...</p>
+                  <p className="text-on-surface-variant text-sm">{t('loading')}</p>
                 ) : (
                   <div className="flex flex-wrap gap-3">
                     {categories.map(cat => {
@@ -589,7 +645,7 @@ export default function ProfilePage() {
                   </div>
                 )}
                 {batchDirty && (
-                  <p className="text-xs text-amber-600 mt-4">لديك تغييرات لم يتم حفظها. اضغط "حفظ التغييرات" أعلى الصفحة.</p>
+                  <p className="text-xs text-amber-600 mt-4">{t('unsavedHint')}</p>
                 )}
               </section>
             </div>
@@ -600,7 +656,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-primary" />
-                    العناوين المسجلة
+                    {t('addresses.title')}
                   </h2>
                   {!addressDraft && (
                     <button
@@ -609,7 +665,7 @@ export default function ProfilePage() {
                       className="text-primary font-bold bg-primary/5 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-primary/10"
                     >
                       <Plus className="w-4 h-4" />
-                      إضافة عنوان
+                      {t('addresses.add')}
                     </button>
                   )}
                 </div>
@@ -624,12 +680,12 @@ export default function ProfilePage() {
                       <div className="text-right flex-1 min-w-0">
                         <p className="text-sm font-bold flex items-center gap-1.5">
                           <MapPin className="w-4 h-4 text-primary" />
-                          الموقع على الخريطة
+                          {t('addresses.mapLocation')}
                         </p>
                         <p className="text-xs text-on-surface-variant mt-0.5">
                           {typeof addressDraft.lat === 'number' && typeof addressDraft.lng === 'number'
-                            ? `محدد: ${addressDraft.lat.toFixed(5)}, ${addressDraft.lng.toFixed(5)}`
-                            : 'لم يتم تحديد موقع بعد'}
+                            ? t('addresses.locationSet', { lat: addressDraft.lat.toFixed(5), lng: addressDraft.lng.toFixed(5) })
+                            : t('addresses.locationNotSet')}
                         </p>
                       </div>
                       <button
@@ -637,12 +693,12 @@ export default function ProfilePage() {
                         onClick={() => setPickerOpen(true)}
                         className="bg-primary text-on-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-container transition-colors shrink-0"
                       >
-                        {typeof addressDraft.lat === 'number' ? 'تعديل على الخريطة' : 'تحديد على الخريطة'}
+                        {typeof addressDraft.lat === 'number' ? t('addresses.editOnMap') : t('addresses.setOnMap')}
                       </button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-bold block mb-1">الاسم (مثل المنزل / المكتب)</label>
+                        <label className="text-xs font-bold block mb-1">{t('addresses.label')}</label>
                         <input
                           type="text"
                           value={addressDraft.label}
@@ -651,18 +707,18 @@ export default function ProfilePage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold block mb-1">العنوان التفصيلي</label>
+                        <label className="text-xs font-bold block mb-1">{t('addresses.detail')}</label>
                         <input
                           type="text"
                           value={addressDraft.addressLine}
                           onChange={(e) => setAddressDraft({ ...addressDraft, addressLine: e.target.value })}
-                          placeholder="الشارع، رقم المبنى..."
+                          placeholder={t('addresses.detailPlaceholder')}
                           className="w-full bg-surface-container-low rounded-xl px-3 py-2 text-sm"
                           required
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold block mb-1">المدينة</label>
+                        <label className="text-xs font-bold block mb-1">{t('addresses.city')}</label>
                         <input
                           type="text"
                           value={addressDraft.city}
@@ -671,7 +727,7 @@ export default function ProfilePage() {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold block mb-1">الحي / المنطقة</label>
+                        <label className="text-xs font-bold block mb-1">{t('addresses.area')}</label>
                         <input
                           type="text"
                           value={addressDraft.area}
@@ -687,7 +743,7 @@ export default function ProfilePage() {
                         onChange={(e) => setAddressDraft({ ...addressDraft, isPrimary: e.target.checked })}
                         className="w-4 h-4 accent-primary"
                       />
-                      تعيين كعنوان أساسي
+                      {t('addresses.setPrimary')}
                     </label>
                     <div className="flex gap-2 pt-2">
                       <button
@@ -696,7 +752,7 @@ export default function ProfilePage() {
                         disabled={addressSaving}
                         className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold disabled:opacity-40"
                       >
-                        {addressSaving ? 'جاري الحفظ...' : 'حفظ'}
+                        {addressSaving ? t('addresses.saving') : t('addresses.save')}
                       </button>
                       <button
                         type="button"
@@ -704,7 +760,7 @@ export default function ProfilePage() {
                         disabled={addressSaving}
                         className="flex-1 bg-surface-container-low py-3 rounded-xl font-bold disabled:opacity-40"
                       >
-                        إلغاء
+                        {t('addresses.cancel')}
                       </button>
                     </div>
                   </div>
@@ -713,7 +769,7 @@ export default function ProfilePage() {
                 {!addressDraft && addresses.length === 0 && (
                   <div className="bg-surface-container-lowest p-8 rounded-2xl text-center">
                     <MapPin className="w-10 h-10 text-on-surface-variant/30 mx-auto mb-3" />
-                    <p className="text-on-surface-variant">لا توجد عناوين محفوظة</p>
+                    <p className="text-on-surface-variant">{t('addresses.none')}</p>
                   </div>
                 )}
 
@@ -727,7 +783,7 @@ export default function ProfilePage() {
                         <div className="absolute top-4 left-4 flex gap-2">
                           {addr.isPrimary && (
                             <span className="bg-primary-container text-on-primary-container text-xs font-bold px-3 py-1 rounded-full">
-                              الأساسي
+                              {t('addresses.primary')}
                             </span>
                           )}
                           <button
@@ -747,7 +803,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="flex items-start gap-4">
                           <div className="bg-primary/5 p-4 rounded-full">
-                            {addr.label?.includes('مكتب') ? (
+                            {addr.label === t('addresses.labelOffice') || addr.label?.includes('مكتب') || addr.label?.toLowerCase?.().includes('office') ? (
                               <Briefcase className="w-5 h-5 text-primary" />
                             ) : (
                               <Home className="w-5 h-5 text-primary" />
@@ -758,7 +814,7 @@ export default function ProfilePage() {
                             <p className="text-on-surface-variant text-sm leading-relaxed">
                               {addr.addressLine}
                               {(addr.city || addr.area) && <br />}
-                              {[addr.area, addr.city].filter(Boolean).join('، ')}
+                              {[addr.area, addr.city].filter(Boolean).join(locale === 'ar' ? '، ' : ', ')}
                             </p>
                           </div>
                         </div>
@@ -775,7 +831,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <CreditCard className="w-5 h-5 text-primary" />
-                    طرق الدفع
+                    {t('payment.title')}
                   </h2>
                   <button
                     type="button"
@@ -783,39 +839,39 @@ export default function ProfilePage() {
                     className="text-primary font-bold bg-primary/5 px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-primary/10"
                   >
                     <Plus className="w-4 h-4" />
-                    إضافة بطاقة
+                    {t('payment.add')}
                   </button>
                 </div>
 
                 {showAddCard && (
                   <div className="bg-surface-container-low rounded-xl p-4 mb-4 space-y-3">
-                    <input type="text" placeholder="اسم حامل البطاقة" value={cardForm.cardholderName} onChange={e => setCardForm({...cardForm, cardholderName: e.target.value})} className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none" />
-                    <input type="text" placeholder="آخر 4 أرقام" maxLength={4} value={cardForm.lastFourDigits} onChange={e => setCardForm({...cardForm, lastFourDigits: e.target.value.replace(/\D/g, '')})} dir="ltr" className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none" />
+                    <input type="text" placeholder={t('payment.holderPlaceholder')} value={cardForm.cardholderName} onChange={e => setCardForm({...cardForm, cardholderName: e.target.value})} className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none" />
+                    <input type="text" placeholder={t('payment.last4Placeholder')} maxLength={4} value={cardForm.lastFourDigits} onChange={e => setCardForm({...cardForm, lastFourDigits: e.target.value.replace(/\D/g, '')})} dir="ltr" className="w-full bg-white border-none rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-primary/20 outline-none" />
                     <div className="flex gap-2">
                       <select value={cardForm.cardBrand} onChange={e => setCardForm({...cardForm, cardBrand: e.target.value as any})} className="flex-1 bg-white border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20">
                         <option value="visa">Visa</option>
                         <option value="mastercard">Mastercard</option>
-                        <option value="meza">ميزة</option>
+                        <option value="meza">{t('payment.brandMeza')}</option>
                       </select>
-                      <input type="number" placeholder="شهر" min={1} max={12} value={cardForm.expiryMonth} onChange={e => setCardForm({...cardForm, expiryMonth: parseInt(e.target.value)})} className="w-20 bg-white border-none rounded-lg px-2 py-2 text-sm text-center focus:ring-2 focus:ring-primary/20 outline-none" />
-                      <input type="number" placeholder="سنة" min={2025} value={cardForm.expiryYear} onChange={e => setCardForm({...cardForm, expiryYear: parseInt(e.target.value)})} className="w-24 bg-white border-none rounded-lg px-2 py-2 text-sm text-center focus:ring-2 focus:ring-primary/20 outline-none" />
+                      <input type="number" placeholder={t('payment.monthPlaceholder')} min={1} max={12} value={cardForm.expiryMonth} onChange={e => setCardForm({...cardForm, expiryMonth: parseInt(e.target.value)})} className="w-20 bg-white border-none rounded-lg px-2 py-2 text-sm text-center focus:ring-2 focus:ring-primary/20 outline-none" />
+                      <input type="number" placeholder={t('payment.yearPlaceholder')} min={2025} value={cardForm.expiryYear} onChange={e => setCardForm({...cardForm, expiryYear: parseInt(e.target.value)})} className="w-24 bg-white border-none rounded-lg px-2 py-2 text-sm text-center focus:ring-2 focus:ring-primary/20 outline-none" />
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={handleAddCard} className="flex-1 bg-primary text-on-primary py-2 rounded-lg text-sm font-bold">حفظ</button>
-                      <button onClick={() => setShowAddCard(false)} className="flex-1 bg-surface-container-high py-2 rounded-lg text-sm font-bold">إلغاء</button>
+                      <button onClick={handleAddCard} className="flex-1 bg-primary text-on-primary py-2 rounded-lg text-sm font-bold">{t('payment.save')}</button>
+                      <button onClick={() => setShowAddCard(false)} className="flex-1 bg-surface-container-high py-2 rounded-lg text-sm font-bold">{t('payment.cancel')}</button>
                     </div>
                   </div>
                 )}
 
                 {paymentMethods.length === 0 && !showAddCard ? (
-                  <p className="text-sm text-on-surface-variant text-center py-8">لا توجد بطاقات محفوظة</p>
+                  <p className="text-sm text-on-surface-variant text-center py-8">{t('payment.none')}</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {paymentMethods.map(card => (
                       <div key={card._id} className="relative bg-gradient-to-br from-primary to-primary-container text-on-primary p-6 rounded-2xl shadow-lg overflow-hidden">
                         <div className="flex justify-between items-start mb-8">
                           <div className="flex flex-col">
-                            <span className="text-xs text-on-primary/70">الرصيد</span>
+                            <span className="text-xs text-on-primary/70">{t('payment.balance')}</span>
                             <span className="font-bold text-lg uppercase">{card.cardBrand}</span>
                           </div>
                           <CreditCard className="w-8 h-8 opacity-80" />
@@ -825,31 +881,31 @@ export default function ProfilePage() {
                         </div>
                         <div className="flex justify-between items-end text-sm">
                           <div>
-                            <div className="text-xs opacity-70">الاسم</div>
+                            <div className="text-xs opacity-70">{t('payment.name')}</div>
                             <div className="font-bold">{card.cardholderName}</div>
                           </div>
                           <div>
-                            <div className="text-xs opacity-70">الانتهاء</div>
+                            <div className="text-xs opacity-70">{t('payment.expiry')}</div>
                             <div className="font-bold" dir="ltr">{String(card.expiryMonth).padStart(2, '0')}/{card.expiryYear}</div>
                           </div>
                         </div>
                         <div className="absolute top-4 right-4 flex gap-2">
                           {card.isDefault ? (
-                            <span className="text-xs bg-white/20 backdrop-blur px-2 py-1 rounded-full font-bold">افتراضي</span>
+                            <span className="text-xs bg-white/20 backdrop-blur px-2 py-1 rounded-full font-bold">{t('payment.default')}</span>
                           ) : (
                             <button
                               type="button"
                               onClick={() => handleSetDefault(card._id)}
                               className="text-xs bg-white/10 hover:bg-white/20 backdrop-blur px-2 py-1 rounded-full font-bold"
                             >
-                              تعيين كافتراضي
+                              {t('payment.setDefault')}
                             </button>
                           )}
                           <button
                             type="button"
                             onClick={() => handleDeleteCard(card._id)}
                             className="bg-white/10 hover:bg-red-500/40 p-1 rounded-full"
-                            aria-label="حذف"
+                            aria-label={t('payment.deleteAriaLabel')}
                           >
                             <XIcon className="w-4 h-4" />
                           </button>
@@ -867,7 +923,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <History className="w-5 h-5 text-primary" />
-                    سجل الطلبات
+                    {t('orders.title')}
                   </h2>
                   <div className="flex gap-2">
                     <button
@@ -877,7 +933,7 @@ export default function ProfilePage() {
                         orderTab === 'in_progress' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant'
                       }`}
                     >
-                      قيد التنفيذ
+                      {t('orders.inProgress')}
                     </button>
                     <button
                       type="button"
@@ -886,30 +942,111 @@ export default function ProfilePage() {
                         orderTab === 'history' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant'
                       }`}
                     >
-                      السجل
+                      {t('orders.history')}
                     </button>
                   </div>
                 </div>
 
+                {/* Pending Confirmation — worker-initiated orders awaiting customer action.
+                    Rendered only on the in_progress tab. */}
+                {orderTab === 'in_progress' && orders.some(o => o.status === 'pending_customer_confirmation') && (
+                  <div className="mb-6 border border-orange-200 bg-orange-50/40 rounded-xl p-4">
+                    <h3 className="font-bold mb-3 text-orange-700">طلبات بانتظار تأكيدك</h3>
+                    {pendingActionError && <p className="text-sm text-red-600 mb-2">{pendingActionError}</p>}
+                    <div className="space-y-3">
+                      {orders.filter(o => o.status === 'pending_customer_confirmation').map(order => (
+                        <div key={order._id} className="bg-surface-container-lowest rounded-xl p-4 flex flex-wrap items-center gap-3">
+                          <div className="flex-1 min-w-[180px]">
+                            <p className="font-bold">{order.customTitle || order.serviceId?.name || t('orders.service')}</p>
+                            <p className="text-xs text-on-surface-variant mt-1">
+                              {order.workerId?.firstName} {order.workerId?.lastName} • {Number(order.customPrice || order.proposedPrice || 0)} جنيه
+                              {' • '}
+                              {order.paymentTiming === 'before' ? 'دفع قبل الخدمة' : 'دفع بعد الخدمة'}
+                              {' • '}
+                              {order.paymentMode === 'card' ? 'بطاقة' : 'كاش'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={pendingActionId === order._id}
+                              onClick={() => handleConfirmWorkerOrder(order._id)}
+                              className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-bold disabled:opacity-50"
+                            >
+                              {pendingActionId === order._id ? '...' : (order.paymentTiming === 'before' && order.paymentMode === 'card' ? 'تأكيد ودفع' : 'تأكيد')}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pendingActionId === order._id}
+                              onClick={() => handleRejectWorkerOrder(order._id)}
+                              className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 text-sm font-bold disabled:opacity-50"
+                            >
+                              رفض
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {orders.length === 0 ? (
-                  <p className="text-sm text-on-surface-variant text-center py-12">لا توجد طلبات</p>
+                  <p className="text-sm text-on-surface-variant text-center py-12">{t('orders.none')}</p>
                 ) : (
                   <div className="space-y-4">
-                    {orders.map(order => {
-                      const cfg = statusConfig[order.status] || statusConfig.pending
+                    {orders.filter(o => o.status !== 'pending_customer_confirmation').map(order => {
+                      // After-service orders whose work is done but payment hasn't been
+                      // collected get a special "done — payment due" treatment: amber badge
+                      // instead of green, plus the amount surfaced on the card.
+                      const paymentDue =
+                        order.status === 'completed' &&
+                        order.paymentTiming === 'after' &&
+                        !order.payment
+                      const cfg = paymentDue
+                        ? { bg: 'bg-amber-50', text: 'text-amber-700', key: 'statusCompleted' }
+                        : (statusColors[order.status] || statusColors.pending)
+                      const amount = Number(order.customPrice || order.proposedPrice || 0)
                       return (
-                        <div key={order._id} className="bg-surface-container-low rounded-xl p-4 flex items-center gap-4">
+                        <div key={order._id} className="bg-surface-container-low rounded-xl p-4 flex items-center gap-4 flex-wrap">
                           <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <ShoppingBag className="w-5 h-5 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold truncate">{order.serviceId?.name || 'خدمة'}</p>
+                            <p className="font-bold truncate">{order.customTitle || order.serviceId?.name || t('orders.service')}</p>
                             <p className="text-xs text-on-surface-variant">
                               {order.workerId?.firstName} {order.workerId?.lastName} • {formatDate(order.createdAt)}
                             </p>
+                            {paymentDue && amount > 0 && (
+                              <p className="text-xs font-bold text-amber-700 mt-1">
+                                {order.paymentMode === 'card'
+                                  ? `بانتظار الدفع — ${amount} جنيه`
+                                  : `ادفع للحرفي نقداً — ${amount} جنيه`}
+                              </p>
+                            )}
+                            {order.problemImages && order.problemImages.length > 0 && (
+                              <div className="mt-3 flex gap-2 flex-wrap">
+                                {order.problemImages.map((url, idx) => (
+                                  <a
+                                    key={url}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-14 h-14 rounded-lg overflow-hidden bg-surface-container-low hover:opacity-80 transition-opacity"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={url}
+                                      alt={`صورة المشكلة ${idx + 1}`}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <span className={`text-xs font-bold px-3 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
-                            {cfg.label}
+                            {paymentDue ? 'تم — بانتظار الدفع' : t(`orders.${cfg.key}` as any)}
                           </span>
                           {order.status === 'pending' && (
                             <button
@@ -917,7 +1054,34 @@ export default function ProfilePage() {
                               onClick={() => setCancellingOrder(order)}
                               className="text-red-600 text-xs font-bold hover:underline"
                             >
-                              إلغاء
+                              {t('orders.cancel')}
+                            </button>
+                          )}
+                          {/* Pay-now button for after-service card orders whose work is done
+                              but payment hasn't been collected yet. Reuses the standard
+                              /payments/checkout endpoint (relaxed to accept completed orders
+                              with paymentTiming='after'). */}
+                          {order.status === 'completed' &&
+                            order.paymentTiming === 'after' &&
+                            order.paymentMode === 'card' &&
+                            !order.payment && (
+                            <button
+                              type="button"
+                              disabled={pendingActionId === order._id}
+                              onClick={async () => {
+                                setPendingActionId(order._id)
+                                setPendingActionError('')
+                                try {
+                                  const c = await api.postWithAuth('/payments/checkout', { orderId: order._id })
+                                  if (c?.checkoutUrl) window.location.href = c.checkoutUrl
+                                } catch (err: any) {
+                                  setPendingActionError(err?.message || 'تعذر بدء الدفع')
+                                  setPendingActionId(null)
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-50"
+                            >
+                              ادفع الآن
                             </button>
                           )}
                           {order.status === 'completed' && !order.review && (
@@ -927,7 +1091,7 @@ export default function ProfilePage() {
                               className="text-primary text-xs font-bold hover:underline flex items-center gap-1"
                             >
                               <Star className="w-3 h-3" />
-                              قيّم
+                              {t('orders.rate')}
                             </button>
                           )}
                         </div>
@@ -963,7 +1127,7 @@ export default function ProfilePage() {
               <section className="bg-surface-container-lowest rounded-xl p-8 shadow-sm space-y-6">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <Settings className="w-5 h-5 text-primary" />
-                  إعدادات الحساب
+                  {t('settings.title')}
                 </h2>
 
                 
@@ -972,7 +1136,7 @@ export default function ProfilePage() {
                   className="inline-flex items-center gap-2 bg-primary/5 text-primary px-4 py-3 rounded-xl font-bold hover:bg-primary/10"
                 >
                   <Pencil className="w-4 h-4" />
-                  تعديل الملف الشخصي الكامل (الصورة، السيرة الذاتية...)
+                  {t('settings.editFullProfile')}
                 </Link>
               </section>
             </div>

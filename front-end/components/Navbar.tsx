@@ -223,7 +223,7 @@ export default function Navbar() {
                       {/* Services group */}
                       {suggestions.some(s => s.kind === 'service') && (
                         <>
-                          <p className="px-3 py-1.5 text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">الخدمات</p>
+                          <p className="px-3 py-1.5 text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">{t('navbarExtra.searchServicesGroup')}</p>
                           {suggestions.filter(s => s.kind === 'service').map(s => (
                             <button
                               key={`svc-${s._id}`}
@@ -246,7 +246,7 @@ export default function Navbar() {
                       {/* Categories group */}
                       {suggestions.some(s => s.kind === 'category') && (
                         <>
-                          <p className="px-3 py-1.5 text-[10px] font-bold text-on-surface-variant uppercase tracking-wide border-t border-outline-variant/10 mt-1">الفئات</p>
+                          <p className="px-3 py-1.5 text-[10px] font-bold text-on-surface-variant uppercase tracking-wide border-t border-outline-variant/10 mt-1">{t('navbarExtra.searchCategoriesGroup')}</p>
                           {suggestions.filter(s => s.kind === 'category').map(s => (
                             <button
                               key={`cat-${s._id}`}
@@ -281,7 +281,7 @@ export default function Navbar() {
                   <Link
                     href="/messages"
                     className="relative p-2 rounded-full hover:bg-surface-container-high transition-colors"
-                    title="الرسائل"
+                    title={t('navbarExtra.messagesTitle')}
                   >
                     <MessageSquare className="w-5 h-5 text-primary" />
                     {totalChatUnread > 0 && (
@@ -325,10 +325,10 @@ export default function Navbar() {
                             Shows the title "الإشعارات" on the left (visually right in RTL)
                             and a "Mark all as read" button when there are unread notifications. */}
                         <div className="flex items-center justify-between px-3 py-2 border-b border-outline-variant/15">
-                          <span className="text-sm font-bold text-on-surface">الإشعارات</span>
+                          <span className="text-sm font-bold text-on-surface">{t('navbar.notifications')}</span>
                           {unreadCount > 0 && (
                             <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline">
-                              تعيين الكل كمقروء
+                              {t('navbar.markAllRead')}
                             </button>
                           )}
                         </div>
@@ -343,13 +343,13 @@ export default function Navbar() {
                           <>
                             <div className="py-8 text-center">
                               <BellRing className="w-8 h-8 text-on-surface-variant/20 mx-auto mb-2" />
-                              <p className="text-sm text-on-surface-variant">لا توجد إشعارات جديدة</p>
+                              <p className="text-sm text-on-surface-variant">{t('navbar.noNotifications')}</p>
                             </div>
                             <Link
                               href="/notifications"
                               className="block text-center text-xs font-semibold text-primary hover:underline border-t border-outline-variant/15 px-3 py-2.5"
                             >
-                              عرض كل الإشعارات
+                              {t('navbar.viewAllNotifications')}
                             </Link>
                           </>
                         ) : (
@@ -371,7 +371,7 @@ export default function Navbar() {
                                     <p className="text-sm font-bold text-on-surface">{notif.title}</p>
                                     <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2">{notif.message}</p>
                                     <p className="text-[10px] text-on-surface-variant/60 mt-1">
-                                      {new Date(notif.createdAt).toLocaleDateString('ar-EG', {
+                                      {new Date(notif.createdAt).toLocaleDateString(activeLocale === 'ar' ? 'ar-EG' : 'en-US', {
                                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                       })}
                                     </p>
@@ -398,7 +398,7 @@ export default function Navbar() {
                             href="/notifications"
                             className="block text-center text-xs font-semibold text-primary hover:underline border-t border-outline-variant/15 px-3 py-2.5"
                           >
-                            عرض كل الإشعارات
+                            {t('navbar.viewAllNotifications')}
                           </Link>
                         )}
                       </DropdownMenu.Content>
@@ -488,7 +488,7 @@ export default function Navbar() {
                       <DropdownMenu.Item className={dropdownItemStyles} asChild>
                         <Link href="/profile">
                           <UserCircle className="w-4 h-4 text-on-surface-variant" />
-                          <span className="flex-1 text-right">الملف الشخصي</span>
+                          <span className="flex-1 text-right">{t('navbarExtra.profile')}</span>
                         </Link>
                       </DropdownMenu.Item>
 
@@ -496,21 +496,21 @@ export default function Navbar() {
                       <DropdownMenu.Item className={dropdownItemStyles} asChild>
                         <Link href={user?.role === 'admin' ? '/admin' : user?.role === 'worker' ? '/dashboard' : '/profile'}>
                           <LayoutDashboard className="w-4 h-4 text-on-surface-variant" />
-                          <span className="flex-1 text-right">لوحة التحكم</span>
+                          <span className="flex-1 text-right">{t('navbarExtra.dashboard')}</span>
                         </Link>
                       </DropdownMenu.Item>
 
                       <DropdownMenu.Item className={dropdownItemStyles} asChild>
                         <Link href="/favorites">
                           <Heart className="w-4 h-4 text-on-surface-variant" />
-                          <span className="flex-1 text-right">المفضلة</span>
+                          <span className="flex-1 text-right">{t('navbarExtra.favorites')}</span>
                         </Link>
                       </DropdownMenu.Item>
 
                       <DropdownMenu.Item className={dropdownItemStyles} asChild>
                         <Link href={supportHref}>
                           <LifeBuoy className="w-4 h-4 text-on-surface-variant" />
-                          <span className="flex-1 text-right">الدعم والمساعدة</span>
+                          <span className="flex-1 text-right">{t('navbarExtra.supportHelp')}</span>
                         </Link>
                       </DropdownMenu.Item>
 
@@ -524,28 +524,65 @@ export default function Navbar() {
                         onSelect={logout}
                       >
                         <LogOut className="w-4 h-4" />
-                        <span className="flex-1 text-right">تسجيل الخروج</span>
+                        <span className="flex-1 text-right">{t('navbarExtra.logout')}</span>
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
+                
               </>
 
             ) : (
               // STATE: GUEST — Show sign in and sign up buttons
               <div className="flex gap-3 items-center">
+              <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button className="p-2 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer">
+                        <Globe className="w-5 h-5 text-primary" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        className={dropdownContentStyles}
+                        align="end"
+                        sideOffset={8}
+                      >
+                        <DropdownMenu.Label className="px-3 py-2 text-sm font-bold text-on-surface">
+                          {t('common.language')}
+                        </DropdownMenu.Label>
+                        <DropdownMenu.Separator className="h-px bg-outline-variant/20 my-1" />
+
+                        <DropdownMenu.Item
+                          onSelect={() => handleLocaleChange('ar')}
+                          className={`${dropdownItemStyles} ${activeLocale === 'ar' ? 'font-semibold text-primary' : ''}`}
+                        >
+                          {activeLocale === 'ar' ? <Check className="w-4 h-4" /> : <span className="w-4" />}
+                          <span className="flex-1 text-right">{t('common.arabic')}</span>
+                        </DropdownMenu.Item>
+
+                        <DropdownMenu.Item
+                          onSelect={() => handleLocaleChange('en')}
+                          className={`${dropdownItemStyles} ${activeLocale === 'en' ? 'font-semibold text-primary' : ''}`}
+                        >
+                          {activeLocale === 'en' ? <Check className="w-4 h-4" /> : <span className="w-4" />}
+                          <span className="flex-1 text-right">{t('common.english')}</span>
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
                 <Link
                   href="/signin"
                   className="text-primary font-semibold text-sm hover:underline px-4 py-2"
                 >
-                  تسجيل الدخول
+                  {t('navbarExtra.signin')}
                 </Link>
                 <Link
                   href="/signup"
                   className="bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity"
                 >
-                  إنشاء حساب
+                  {t('navbarExtra.signup')}
                 </Link>
+                
               </div>
             )}
           </div>
@@ -556,27 +593,27 @@ export default function Navbar() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white shadow-[0_-8px_24px_-12px_rgba(18,28,42,0.1)] px-6 py-3 flex justify-between items-center z-50">
         <Link href="/" className="flex flex-col items-center gap-1 text-primary">
           <Home className="w-5 h-5" />
-          <span className="text-[10px] font-bold">الرئيسية</span>
+          <span className="text-[10px] font-bold">{t('navbarExtra.mobileHome')}</span>
         </Link>
-        <button className="flex flex-col items-center gap-1 text-on-surface-variant">
+        <Link href="/services" className={`flex flex-col items-center gap-1 ${pathname === '/services' ? 'text-primary' : 'text-on-surface-variant'}`}>
           <Grid3x3 className="w-5 h-5" />
-          <span className="text-[10px]">الفئات</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-on-surface-variant">
+          <span className={`text-[10px] ${pathname === '/services' ? 'font-bold' : ''}`}>{t('navbarExtra.mobileCategories')}</span>
+        </Link>
+        <Link href="/profile#orders" className={`flex flex-col items-center gap-1 ${pathname === '/profile' ? 'text-primary' : 'text-on-surface-variant'}`}>
           <Receipt className="w-5 h-5" />
-          <span className="text-[10px]">طلباتي</span>
-        </button>
+          <span className={`text-[10px] ${pathname === '/profile' ? 'font-bold' : ''}`}>{t('navbarExtra.mobileOrders')}</span>
+        </Link>
         {isLoggedIn ? (
           <Link href={user?.role === 'admin' ? '/admin' : user?.role === 'worker' ? '/dashboard' : '/profile'} className="flex flex-col items-center gap-1 text-on-surface-variant">
             <div className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[8px] font-bold">
               {getInitial()}
             </div>
-            <span className="text-[10px]">حسابي</span>
+            <span className="text-[10px]">{t('navbarExtra.mobileAccount')}</span>
           </Link>
         ) : (
           <Link href="/signin" className="flex flex-col items-center gap-1 text-on-surface-variant">
             <LogIn className="w-5 h-5" />
-            <span className="text-[10px]">دخول</span>
+            <span className="text-[10px]">{t('navbarExtra.mobileSignin')}</span>
           </Link>
         )}
       </div>

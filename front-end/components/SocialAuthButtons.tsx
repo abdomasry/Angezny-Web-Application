@@ -168,7 +168,7 @@ export default function SocialAuthButtons({ redirectTo = '/', onError }: Props) 
     'flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3">
       <button type="button" disabled={busy !== null} onClick={() => startGoogle()} className={baseBtn}>
         {busy === 'google' ? (
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -183,16 +183,7 @@ export default function SocialAuthButtons({ redirectTo = '/', onError }: Props) 
         <span>{t('auth.signin.google')}</span>
       </button>
 
-      <button type="button" disabled={busy !== null} onClick={handleFacebook} className={baseBtn}>
-        {busy === 'facebook' ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073C0 18.063 4.388 23.027 10.125 23.927v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.668 4.533-4.668 1.312 0 2.686.234 2.686.234v2.953h-1.513c-1.491 0-1.956.925-1.956 1.875v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.063 24 12.073" />
-          </svg>
-        )}
-        <span>{t('auth.signin.facebook')}</span>
-      </button>
+      
     </div>
   )
 }

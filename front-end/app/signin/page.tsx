@@ -197,12 +197,6 @@ export default function SignInPage() {
               )}
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center gap-2 px-1">
-              <input className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/30" id="remember" type="checkbox" />
-              <label className="text-sm text-on-surface-variant cursor-pointer" htmlFor="remember">{t('auth.signin.rememberMe')}</label>
-            </div>
-
             {/* Server-side rejection (wrong password, account locked, …) */}
             {submitError && (
               <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-center">

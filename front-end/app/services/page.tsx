@@ -15,6 +15,7 @@ import Navbar from '@/components/Navbar'
 import HeartButton from '@/components/HeartButton'
 import BecomeProviderBanner from '@/components/BecomeProviderBanner'
 import ServiceGridCard from '@/components/services/ServiceGridCard'
+import Pagination from '@/components/Pagination'
 import { useAuth } from '@/lib/auth-context'
 import { useChat } from '@/lib/chat-context'
 import {
@@ -298,6 +299,7 @@ function ServicesContent() {
   // Format a service row's price + unit. Mirrors how the design labels
   // prices: "XXX ج.م / <unit>" when applicable, otherwise just the amount.
   const formatServicePrice = (service: WorkerService) => {
+    if (service.typeofService === 'custom') return 'سعر مخصص'
     if (service.typeofService === 'range' && service.priceRange) {
       return `${service.priceRange.min ?? 0} - ${service.priceRange.max ?? 0} ج.م`
     }
@@ -586,23 +588,37 @@ function ServicesContent() {
                                       now) button is the primary CTA that navigates to /checkout
                                       for this specific serviceId. */}
                                   <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAskService(service, worker)}
-                                      title="استفسر عن هذه الخدمة"
-                                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
-                                    >
-                                      <MessageCircleQuestion className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOrderService(service)}
-                                      title="اطلب هذه الخدمة الآن"
-                                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
-                                    >
-                                      <ShoppingBag className="w-3.5 h-3.5" />
-                                      <span>اطلب</span>
-                                    </button>
+                                    {service.typeofService === 'custom' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAskService(service, worker)}
+                                        title="تواصل مع الحرفي لمعرفة السعر"
+                                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
+                                      >
+                                        <MessageCircleQuestion className="w-3.5 h-3.5" />
+                                        <span>اسأل</span>
+                                      </button>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAskService(service, worker)}
+                                          title="استفسر عن هذه الخدمة"
+                                          className="p-1.5 rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+                                        >
+                                          <MessageCircleQuestion className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOrderService(service)}
+                                          title="اطلب هذه الخدمة الآن"
+                                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary-container transition-colors"
+                                        >
+                                          <ShoppingBag className="w-3.5 h-3.5" />
+                                          <span>اطلب</span>
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -726,36 +742,13 @@ function ServicesContent() {
                 • Geo:     cursor "load more" using the last item's
                            distanceMeters + _id. Single button, no page numbers
                            (we don't know the total in geo mode). */}
-            {!geoMode && pagination.pages > 1 && !loading && (
-              <div className="flex justify-center items-center gap-2 pt-4">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-                >
-                  <ChevronLeft className="w-5 h-5 rotate-180" />
-                </button>
-                {Array.from({ length: Math.min(pagination.pages, 5) }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold transition-colors ${
-                      currentPage === page
-                        ? 'bg-primary text-white'
-                        : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(pagination.pages, p + 1))}
-                  disabled={currentPage === pagination.pages}
-                  className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant disabled:opacity-30"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-              </div>
+            {!geoMode && !loading && (
+              <Pagination
+                page={currentPage}
+                totalPages={pagination.pages}
+                onPageChange={setCurrentPage}
+                className="pt-4"
+              />
             )}
             {geoMode && pagination.hasMore && !loading && (
               <div className="flex justify-center pt-4">

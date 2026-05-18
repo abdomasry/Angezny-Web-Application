@@ -366,7 +366,7 @@ const addService = async (req, res) => {
     }
 
     // Step 2: Validate required fields
-    const { name, categoryId, description, price, typeofService, priceRange, images } = req.body;
+    const { name, categoryId, description, price, typeofService, priceRange, paymentTiming, images } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Service name is required" });
     }
@@ -402,6 +402,7 @@ const addService = async (req, res) => {
       price,
       typeofService,
       priceRange,
+      paymentTiming: ["before", "after"].includes(paymentTiming) ? paymentTiming : "before",
       active: false,
       approvalStatus: "pending",
     });
@@ -431,7 +432,7 @@ const addService = async (req, res) => {
             title: "خدمة جديدة بانتظار الموافقة",
             message: `قام ${workerName} بإضافة خدمة جديدة "${service.name}" وهي بانتظار موافقتك.`,
             type: "info",
-            link: "/admin/services",
+            link: "/admin",
           }));
           await Notification.insertMany(notifications);
         }
@@ -464,7 +465,7 @@ const updateService = async (req, res) => {
     }
 
     // Step 2: Build the update object with only sent fields
-    const { name, description, images, price, typeofService, priceRange, categoryId, active } = req.body;
+    const { name, description, images, price, typeofService, priceRange, paymentTiming, categoryId, active } = req.body;
     // Single-category-enforced workers can't change the category — silently
     // ignore any incoming categoryId. Their services stay locked to
     // profile.Category set at approval time.
@@ -476,6 +477,7 @@ const updateService = async (req, res) => {
       ...(price && { price }),
       ...(typeofService && { typeofService }),
       ...(priceRange && { priceRange }),
+      ...(paymentTiming && ["before", "after"].includes(paymentTiming) && { paymentTiming }),
       ...(allowedCategoryId && { categoryId: allowedCategoryId }),
       // For 'active', we check explicitly for undefined because false is a valid value
       // Using (active && { active }) would fail: if active=false, the && short-circuits
@@ -521,7 +523,7 @@ const updateService = async (req, res) => {
               title: "خدمة معدلة بانتظار الموافقة",
               message: `قام ${workerName} بتعديل خدمة "${service.name}" بعد رفضها وهي بانتظار مراجعتك.`,
               type: "info",
-              link: "/admin/services",
+              link: "/admin",
             }));
             await Notification.insertMany(notifications);
           }
@@ -589,7 +591,10 @@ const getMyOrders = async (req, res) => {
     // Same status grouping as customer orders
     let statusFilter;
     if (status === "in_progress") {
-      statusFilter = ["pending", "accepted", "in_progress"];
+      // pending_customer_confirmation is included so worker-initiated orders
+      // (waiting on the customer to confirm + pay) stay visible in the
+      // worker's active list.
+      statusFilter = ["pending", "pending_customer_confirmation", "accepted", "in_progress"];
     } else {
       statusFilter = ["completed", "cancelled", "rejected"];
     }

@@ -43,6 +43,21 @@ const walletTransactionSchema = new mongoose.Schema(
     // Short human-readable description shown in the wallet UI. Example:
     // "دفعة مقابل: Full Clean".
     note: { type: String, default: "" },
+    // ─── Withdrawal-only fields ──────────────────────────────────
+    // Populated when source === "withdrawal". Paymob's payout transaction id
+    // is returned from the Payouts API call (sandbox or live) — we store it
+    // so the payout webhook can flip the right doc to completed/failed.
+    paymobPayoutId: String,
+    // Snapshot of where the money was sent (bank / instapay / wallet) at the
+    // time of withdrawal. Kept on the transaction itself so it survives even
+    // if the worker later changes their default payout method.
+    payoutMethod: {
+      type: String,
+      enum: ["bank", "instapay", "wallet"],
+    },
+    // Human-readable failure reason captured from a failed Paymob payout —
+    // shown in the worker's withdrawal history.
+    failureReason: String,
   },
   { timestamps: true },
 );
